@@ -1,0 +1,25 @@
+{
+  "name": "ai-studio-exporter",
+  "version": "1.0.0",
+  "description": "Chrome extension to export conversations from Google AI Studio with media attachments",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "chrome-extension",
+    "google-ai-studio",
+    "export",
+    "conversation",
+    "chat",
+    "markdown",
+    "backup"
+  ],
+  "author": "Sukarth Acharya",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sukarth/ai-studio-exporter"
+  }
+
+}

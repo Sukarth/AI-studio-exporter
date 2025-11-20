@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Studio Exporter Settings</title>
+    <style>
+        :root {
+            --bg-color: #1a1b1e;
+            --card-bg: #25262b;
+            --text-primary: #e9ecef;
+            --text-secondary: #a5a5a5;
+            --accent-color: #667eea;
+            --accent-hover: #5a6fd6;
+            --border-color: #2c2e33;
+            --input-bg: #2c2e33;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .setting-label {
+            font-size: 14px;
+        }
+
+        .sub-setting {
+            margin-left: 28px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #373a40;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent-color);
+        }
+
+        input:focus+.slider {
+            box-shadow: 0 0 1px var(--accent-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Number Input */
+        .number-input {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            width: 100px;
+            font-size: 14px;
+        }
+
+        .number-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        .status-msg {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            background-color: #2b8a3e;
+            color: white;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .status-msg.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Settings</h1>
+            <p class="subtitle">Configure how AI Studio Exporter behaves</p>
+        </div>
+
+        <div class="card">
+            <div class="section-title">Content Extraction</div>
+
+            <div class="setting-group">
+                <div class="setting-item">
+                    <span class="setting-label">Scrape Images</span>
+                    <label class="switch">
+                        <input type="checkbox" id="scrapeImages">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <div class="setting-item">
+                    <span class="setting-label">Scrape Attachments</span>
+                    <label class="switch">
+                        <input type="checkbox" id="scrapeAttachments">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div id="attachmentOptions">
+                    <div class="setting-item sub-setting">
+                        <span class="setting-label">Include Preview Images</span>
+                        <label class="switch">
+                            <input type="checkbox" id="scrapeAttachmentPreview">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item sub-setting">
+                        <span class="setting-label">Include File Name</span>
+                        <label class="switch">
+                            <input type="checkbox" id="scrapeAttachmentTitle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item sub-setting">
+                        <span class="setting-label">Include File Size/Info</span>
+                        <label class="switch">
+                            <input type="checkbox" id="scrapeAttachmentSize">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <div class="setting-item">
+                    <span class="setting-label">Scrape Reasoning Content</span>
+                    <label class="switch">
+                        <input type="checkbox" id="scrapeReasoning">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">Performance</div>
+
+            <div class="setting-item">
+                <div>
+                    <span class="setting-label">Element Load Delay (ms)</span>
+                    <div class="subtitle" style="font-size: 12px; margin-top: 4px;">Increase this if exports are missing
+                        content</div>
+                </div>
+                <input type="number" id="loadDelay" class="number-input" min="100" step="100">
+            </div>
+        </div>
+
+        <div class="actions">
+            <button id="resetBtn" class="btn btn-secondary">Reset to Defaults</button>
+            <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+        </div>
+    </div>
+
+    <div id="statusMsg" class="status-msg">Settings saved successfully</div>
+
+    <script src="options.js"></script>
+</body>
+
+</html>

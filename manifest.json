@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "AI Studio Exporter",
+  "version": "1.0.0",
+  "description": "Export conversations from Google AI Studio with all media attachments and chat history",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "storage"
+  ],
+  "options_page": "options.html",
+  "host_permissions": [
+    "https://aistudio.google.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "images/icon16.png",
+      "32": "images/icon32.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "images/icon16.png",
+    "32": "images/icon32.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://aistudio.google.com/*"
+      ],
+      "js": [
+        "libs/jszip.min.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "libs/jszip.min.js"
+      ],
+      "matches": [
+        "https://aistudio.google.com/*"
+      ]
+    }
+  ]
+}
