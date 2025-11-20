@@ -1,8 +1,8 @@
 # 📦 AI Studio Exporter
 
-A production-ready Browser extension that exports conversations from Google AI Studio, including all media attachments and chat history in a convenient ZIP file.
+A browser extension that exports conversations from Google AI Studio, including all media attachments and chat history in a convenient ZIP file.
 
-![Demo of AI Studio Exporter](images/demo.gif)
+![Demo of AI Studio Exporter](https://raw.githubusercontent.com/Sukarth/AI-studio-exporter/main/images/Demo.gif)
 
 ## ✨ Features
 
