@@ -5,6 +5,15 @@ All notable changes to the AI Studio Exporter extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-02-19
+
+### Fixed
+- Fixed issues with raw mode toggling functionality
+- Improved image scraping reliability
+
+### Added
+- Added GitHub repository link button to popup interface
+
 ## [1.0.0] - 2025-11-20
 
 ### Added
@@ -42,5 +51,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export to HTML with styling
 
 ---
-
-[1.0.0]: https://github.com/sukarth/ai-studio-exporter/releases/tag/v1.0.0

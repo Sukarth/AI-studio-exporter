@@ -3,7 +3,7 @@
  * This script runs in the page context and extracts conversation data from Google AI Studio to be exported
  *
  * @author Sukarth Acharya
- * @version 1.0.0
+ * @version 1.0.1
  * @license MIT
  * @repository https://github.com/sukarth/ai-studio-exporter
  */

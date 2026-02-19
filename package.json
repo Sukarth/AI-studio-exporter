@@ -1,6 +1,6 @@
 {
   "name": "ai-studio-exporter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Chrome extension to export conversations from Google AI Studio with media attachments",
   "main": "background.js",
   "scripts": {
