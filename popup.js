@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnText = document.getElementById('btnText');
   const messageDiv = document.getElementById('message');
   const settingsBtn = document.getElementById('settingsBtn');
+  const exportAllBtn = document.getElementById('exportAllBtn');
 
   // Open settings page
   settingsBtn.addEventListener('click', () => {
@@ -27,27 +28,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         return false;
       }
 
-      const isAIStudio = tab.url.includes('aistudio.google.com')  && tab.url.includes('/prompts/');
+      const isAIStudio = tab.url.includes('aistudio.google.com');
+      const isPrompt = isAIStudio && tab.url.includes('/prompts/');
+      const isLibrary = isAIStudio && tab.url.includes('/library');
 
-      if (isAIStudio) {
-        // Check if export is already running
+      if (isPrompt) {
         try {
           const response = await chrome.tabs.sendMessage(tab.id, { action: 'getStatus' });
           if (response && response.isExporting) {
             updateStatus(true, 'Export in progress...', 'exporting');
-            setLoading(true, true); // true for loading, true for isExporting
+            setLoading(true, true);
           } else {
             updateStatus(true, 'Connected to AI Studio', 'ready');
             setLoading(false);
           }
         } catch (e) {
-          // Content script might not be loaded yet or error
           updateStatus(true, 'Connected to AI Studio', 'ready');
           setLoading(false);
         }
-      } else {
-        updateStatus(false, 'Please navigate to an AI Studio prompt on aistudio.google.com', 'error');
+        exportAllBtn.style.display = 'none';
+      } else if (isLibrary || isAIStudio) {
+        // On library or main page - show batch export button
+        updateStatus(true, 'On AI Studio - Batch export available', 'ready');
         exportBtn.disabled = true;
+        exportAllBtn.style.display = 'block';
+        exportAllBtn.disabled = false;
+
+        // Check batch export status
+        const batchStatus = await chrome.runtime.sendMessage({ action: 'getBatchStatus' });
+        if (batchStatus && batchStatus.isRunning) {
+          exportAllBtn.innerHTML = `⏳ Exporting ${batchStatus.currentIndex + 1}/${batchStatus.total}...`;
+          exportAllBtn.classList.add('running');
+        }
+      } else {
+        updateStatus(false, 'Please navigate to AI Studio', 'error');
+        exportBtn.disabled = true;
+        exportAllBtn.style.display = 'none';
       }
 
       return isAIStudio;
@@ -135,7 +151,84 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMessage('error', `✗ Export failed: ${error.message}`);
       }
     }
-  });  // Initial status check
+  });
+
+  // Handle Export All button
+  exportAllBtn.addEventListener('click', async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) return;
+
+      // Check if already running
+      const batchStatus = await chrome.runtime.sendMessage({ action: 'getBatchStatus' });
+      if (batchStatus && batchStatus.isRunning) {
+        // Cancel
+        await chrome.runtime.sendMessage({ action: 'cancelBatchExport' });
+        exportAllBtn.innerHTML = '📦 Export All Conversations';
+        exportAllBtn.classList.remove('running');
+        return;
+      }
+
+      exportAllBtn.innerHTML = '⏳ Collecting conversation list...';
+      exportAllBtn.disabled = true;
+
+      // Extract conversation IDs from the library page
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const links = document.querySelectorAll('a[href*="/prompts/"]');
+          const convs = [];
+          const seen = new Set();
+          links.forEach(a => {
+            const href = a.getAttribute('href');
+            const match = href.match(/\/prompts\/([a-zA-Z0-9_-]+)/);
+            if (match) {
+              const id = match[1];
+              const name = a.textContent.trim();
+              if (!seen.has(id) && name && name !== 'Playground' && !name.includes('View all')) {
+                seen.add(id);
+                convs.push({ id, name });
+              }
+            }
+          });
+          return convs;
+        }
+      });
+
+      const conversations = results[0]?.result || [];
+
+      if (conversations.length === 0) {
+        exportAllBtn.innerHTML = '❌ No conversations found. Load library page fully.';
+        setTimeout(() => {
+          exportAllBtn.innerHTML = '📦 Export All Conversations';
+          exportAllBtn.disabled = false;
+        }, 3000);
+        return;
+      }
+
+      exportAllBtn.innerHTML = `🚀 Starting export of ${conversations.length} conversations...`;
+
+      // Start batch export via background script
+      await chrome.runtime.sendMessage({
+        action: 'startBatchExport',
+        conversations: conversations,
+        tabId: tab.id,
+      });
+
+      // Close popup - export runs in background
+      window.close();
+
+    } catch (error) {
+      console.error('Batch export error:', error);
+      exportAllBtn.innerHTML = `❌ Error: ${error.message}`;
+      setTimeout(() => {
+        exportAllBtn.innerHTML = '📦 Export All Conversations';
+        exportAllBtn.disabled = false;
+      }, 3000);
+    }
+  });
+
+  // Initial status check
   await checkAIStudioStatus();
 
   // Recheck status when popup is opened

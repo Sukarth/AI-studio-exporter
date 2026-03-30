@@ -7,10 +7,11 @@ A browser extension that exports conversations from Google AI Studio, including 
 ## ✨ Features
 
 - 🔄 **Complete Export**: Exports entire conversation history from Google AI Studio.
+- 📦 **Batch Export All**: Export ALL conversations at once from the Library page - no need to open each one manually.
 - 🖼️ **Media Preservation**: Includes all image attachments in the export.
 - 📝 **Markdown Format**: Conversations are saved in readable Markdown format.
 - 🤖 **Reasoning Support**: Captures model reasoning blocks when available.
-- 📦 **ZIP Archive**: Everything packaged in a single ZIP file.
+- 📦 **ZIP Archive**: Everything packaged in a single ZIP file (single export) or JSON + Markdown files (batch export).
 - 🎨 **User-Friendly**: Simple, intuitive popup interface.
 - ⚡ **Fast & Efficient**: Optimized for performance and works entirely client-side.
 - 🔒 **Privacy-Focused**: NO data is collected or sent to any external servers.
@@ -55,9 +56,20 @@ git pull origin main
 
 ## 📖 Usage
 
+### Single Conversation Export
+
 1.  **Navigate to Google AI Studio**: Go to a conversation you want to export (e.g., `https://aistudio.google.com/prompts/...`).
 2.  **Click the Extension Icon**: The popup will show a "Connected to AI Studio" status.
 3.  **Export**: Click the "Export Conversation" button. The ZIP file containing your conversation and images will be downloaded automatically after the export completes.
+
+### Batch Export (Export All Conversations)
+
+1.  **Navigate to AI Studio Library**: Go to `https://aistudio.google.com/library`.
+2.  **Click the Extension Icon**: You'll see a green "Export All Conversations" button.
+3.  **Click "Export All Conversations"**: The extension will automatically open each conversation, extract the content, and move to the next one.
+4.  **Wait for completion**: A JSON file and a Markdown file containing all your conversations will be downloaded automatically when done. The export runs in the background - you can close the popup.
+
+> **Note**: Batch export may take 15-30 minutes depending on how many conversations you have. You can cancel anytime by clicking the extension icon and pressing the cancel button.
 
 ## 📂 Export Structure
 
@@ -90,6 +102,7 @@ Contributions are welcome! We appreciate any help, from reporting bugs to submit
 - `scripting`: To inject content scripts for data extraction.
 - `downloads`: To trigger the ZIP file download.
 - `storage`: To save user settings.
+- `tabs`: To manage tab navigation during batch export.
 - `host_permissions`: To run on the `aistudio.google.com` domain.
 
 ## 🐛 Troubleshooting & known issues
