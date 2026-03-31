@@ -11,7 +11,8 @@
   ],
   "options_page": "options.html",
   "host_permissions": [
-    "https://aistudio.google.com/*"
+    "https://aistudio.google.com/prompts/*",
+    "https://aistudio.google.com/u/*/prompts/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -46,17 +47,6 @@
         "content.js"
       ],
       "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "libs/jszip.min.js"
-      ],
-      "matches": [
-        "https://aistudio.google.com/prompts/*",
-        "https://aistudio.google.com/u/*/prompts/*"
-      ]
     }
   ]
 }
