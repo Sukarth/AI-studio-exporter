@@ -1,14 +1,3 @@
-// Default settings
-const DEFAULT_SETTINGS = {
-    scrapeImages: true,
-    scrapeAttachments: true,
-    scrapeAttachmentPreview: true,
-    scrapeAttachmentTitle: true,
-    scrapeAttachmentSize: true,
-    scrapeReasoning: true,
-    loadDelay: 700
-};
-
 // DOM Elements
 const elements = {
     scrapeImages: document.getElementById('scrapeImages'),
@@ -37,29 +26,31 @@ elements.resetBtn.addEventListener('click', resetSettings);
 elements.scrapeAttachments.addEventListener('change', toggleAttachmentOptions);
 
 function loadSettings() {
-    chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
-        elements.scrapeImages.checked = settings.scrapeImages;
-        elements.scrapeAttachments.checked = settings.scrapeAttachments;
-        elements.scrapeAttachmentPreview.checked = settings.scrapeAttachmentPreview;
-        elements.scrapeAttachmentTitle.checked = settings.scrapeAttachmentTitle;
-        elements.scrapeAttachmentSize.checked = settings.scrapeAttachmentSize;
-        elements.scrapeReasoning.checked = settings.scrapeReasoning;
-        elements.loadDelay.value = settings.loadDelay;
+    chrome.storage.sync.get(AI_STUDIO_DEFAULT_SETTINGS, (settings) => {
+        const safeSettings = sanitizeSettings(settings);
+
+        elements.scrapeImages.checked = safeSettings.scrapeImages;
+        elements.scrapeAttachments.checked = safeSettings.scrapeAttachments;
+        elements.scrapeAttachmentPreview.checked = safeSettings.scrapeAttachmentPreview;
+        elements.scrapeAttachmentTitle.checked = safeSettings.scrapeAttachmentTitle;
+        elements.scrapeAttachmentSize.checked = safeSettings.scrapeAttachmentSize;
+        elements.scrapeReasoning.checked = safeSettings.scrapeReasoning;
+        elements.loadDelay.value = safeSettings.loadDelay;
 
         toggleAttachmentOptions();
     });
 }
 
 function saveSettings() {
-    const settings = {
+    const settings = sanitizeSettings({
         scrapeImages: elements.scrapeImages.checked,
         scrapeAttachments: elements.scrapeAttachments.checked,
         scrapeAttachmentPreview: elements.scrapeAttachmentPreview.checked,
         scrapeAttachmentTitle: elements.scrapeAttachmentTitle.checked,
         scrapeAttachmentSize: elements.scrapeAttachmentSize.checked,
         scrapeReasoning: elements.scrapeReasoning.checked,
-        loadDelay: parseInt(elements.loadDelay.value, 10) || 700
-    };
+        loadDelay: elements.loadDelay.value
+    });
 
     chrome.storage.sync.set(settings, () => {
         showStatus('Settings saved successfully');
@@ -68,7 +59,7 @@ function saveSettings() {
 
 function resetSettings() {
     if (confirm('Are you sure you want to reset all settings to default?')) {
-        chrome.storage.sync.set(DEFAULT_SETTINGS, () => {
+        chrome.storage.sync.set(AI_STUDIO_DEFAULT_SETTINGS, () => {
             loadSettings();
             showStatus('Settings reset to defaults');
         });

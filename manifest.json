@@ -11,7 +11,8 @@
   ],
   "options_page": "options.html",
   "host_permissions": [
-    "https://aistudio.google.com/*"
+    "https://aistudio.google.com/prompts/*",
+    "https://aistudio.google.com/u/*/prompts/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -31,26 +32,21 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
   "content_scripts": [
     {
       "matches": [
-        "https://aistudio.google.com/*"
+        "https://aistudio.google.com/prompts/*",
+        "https://aistudio.google.com/u/*/prompts/*"
       ],
       "js": [
+        "settings.js",
         "libs/jszip.min.js",
         "content.js"
       ],
       "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "libs/jszip.min.js"
-      ],
-      "matches": [
-        "https://aistudio.google.com/*"
-      ]
     }
   ]
 }

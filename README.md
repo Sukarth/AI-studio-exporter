@@ -15,6 +15,12 @@ A browser extension that exports conversations from Google AI Studio, including 
 - ⚡ **Fast & Efficient**: Optimized for performance and works entirely client-side.
 - 🔒 **Privacy-Focused**: NO data is collected or sent to any external servers.
 
+### 🔐 Security & Privacy
+- Extension pages now ship with an explicit CSP (`script-src 'self'; object-src 'none'`) for defense in depth.
+- Popup and background logic only interact with `https://aistudio.google.com/prompts/` tabs.
+- Messages between scripts are validated and rejected when untrusted or malformed.
+- User settings are sanitized before use to avoid unexpected values.
+
 ## 🚀 Installation (from Source)
 
 Follow these steps to install and run the extension locally. Installation from Chrome Web Store is coming soon...

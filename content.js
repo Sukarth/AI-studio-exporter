@@ -19,6 +19,8 @@
   // Global state
   let isExporting = false;
   let shouldCancel = false;
+  const ALLOWED_ACTIONS = new Set(['export', 'getStatus', 'cancel']);
+  console.log('AI Studio Exporter content script loaded');
 
   // Utility function to sleep/wait
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -353,19 +355,10 @@
   // Get settings from storage
   function getSettings() {
     return new Promise((resolve) => {
-      const DEFAULT_SETTINGS = {
-        scrapeImages: true,
-        scrapeAttachments: true,
-        scrapeAttachmentPreview: true,
-        scrapeAttachmentTitle: true,
-        scrapeAttachmentSize: true,
-        scrapeReasoning: true,
-        loadDelay: 700
-      };
-
-      chrome.storage.sync.get(DEFAULT_SETTINGS, (settings) => {
-        resolve(settings);
-      });
+      chrome.storage.sync.get(
+        AI_STUDIO_DEFAULT_SETTINGS,
+        (settings) => resolve(sanitizeSettings(settings))
+      );
     });
   }
 
@@ -454,6 +447,50 @@
     return document.body.innerHTML.includes("Show conversation with markdown formatting");
   }
 
+  function getMoreActionsButton() {
+    return document.querySelector('button[aria-label="View more actions"]');
+  }
+
+  function getRawOutputToggleButton() {
+    return document.querySelector('button[aria-label="Toggle viewing raw output"]');
+  }
+
+  async function ensureMoreActionsMenuOpen() {
+    const moreActionsButton = getMoreActionsButton();
+    if (!moreActionsButton) {
+      throw new Error('Could not find "View more actions" button');
+    }
+
+    let rawOutputButton = getRawOutputToggleButton();
+    if (rawOutputButton) {
+      return { moreActionsButton, rawOutputButton };
+    }
+
+    moreActionsButton.click();
+    await sleep(CONFIG.ELEMENT_LOAD_DELAY / 5);
+
+    rawOutputButton = getRawOutputToggleButton();
+    if (!rawOutputButton) {
+      throw new Error('Could not find "Toggle viewing raw output" button');
+    }
+
+    return { moreActionsButton, rawOutputButton };
+  }
+
+  async function closeMoreActionsMenuIfOpen() {
+    if (!getRawOutputToggleButton()) {
+      return;
+    }
+
+    const moreActionsButton = getMoreActionsButton();
+    if (!moreActionsButton) {
+      return;
+    }
+
+    moreActionsButton.click();
+    await sleep(CONFIG.ELEMENT_LOAD_DELAY / 5);
+  }
+
   // Main export function
   async function exportConversation() {
     if (isExporting) {
@@ -476,37 +513,32 @@
 
       // Step 1: Check initial raw mode state and toggle if needed
       console.log('Checking raw output mode state...');
-      const moreActionsButton = document.querySelector('button[aria-label="View more actions"]');
-      if (!moreActionsButton) {
-        throw new Error('Could not find "View more actions" button');
-      }
+      let initialRawModeEnabled = false;
+      try {
+        const { rawOutputButton } = await ensureMoreActionsMenuOpen();
 
-      moreActionsButton.click();
-      await sleep(CONFIG.ELEMENT_LOAD_DELAY / 5);
+        // Store the initial state (true = already on, false = currently off)
+        initialRawModeEnabled = isRawModeEnabled();
+        console.log(`Initial raw mode state: ${initialRawModeEnabled ? 'ON' : 'OFF'}`);
 
-      const rawOutputButton = document.querySelector('button[aria-label="Toggle viewing raw output"]');
-      if (!rawOutputButton) {
-        throw new Error('Could not find "Toggle viewing raw output" button');
-      }
+        // Toggle raw mode only if it's not already enabled
+        if (!initialRawModeEnabled) {
+          console.log('Toggling raw output mode ON...');
+          rawOutputButton.click();
+          await sleep(CONFIG.ELEMENT_LOAD_DELAY * 5); // Wait for raw output to load (longer delay needed)
 
-      // Store the initial state (true = already on, false = currently off)
-      const initialRawModeEnabled = isRawModeEnabled();
-      console.log(`Initial raw mode state: ${initialRawModeEnabled ? 'ON' : 'OFF'}`);
-
-      // Toggle raw mode only if it's not already enabled
-      if (!initialRawModeEnabled) {
-        console.log('Toggling raw output mode ON...');
-        rawOutputButton.click();
-        await sleep(CONFIG.ELEMENT_LOAD_DELAY * 5); // Wait for raw output to load (longer delay needed)
-
-        // Verify that raw mode was enabled successfully
-        const rawModeAfterToggle = isRawModeEnabled();
-        console.log(`Raw mode after toggle: ${rawModeAfterToggle ? 'ON' : 'OFF'}`);
-        if (!rawModeAfterToggle) {
-          throw new Error('Failed to enable raw output mode');
+          // Verify that raw mode was enabled successfully
+          const rawModeAfterToggle = isRawModeEnabled();
+          console.log(`Raw mode after toggle: ${rawModeAfterToggle ? 'ON' : 'OFF'}`);
+          if (!rawModeAfterToggle) {
+            throw new Error('Failed to enable raw output mode');
+          }
+        } else {
+          console.log('Raw output mode already ON, skipping toggle');
         }
-      } else {
-        console.log('Raw output mode already ON, skipping toggle');
+      } finally {
+        // Always close the actions menu before continuing export steps.
+        await closeMoreActionsMenuIfOpen();
       }
 
 
@@ -671,24 +703,21 @@
       // Step 5: Revert raw mode to original state if it was toggled
       if (!initialRawModeEnabled) {
         console.log('Reverting raw output mode to original state...');
-        // Need to open the menu again and toggle back
-        const moreActionsButtonRevert = document.querySelector('button[aria-label="View more actions"]');
-        if (moreActionsButtonRevert) {
-          moreActionsButtonRevert.click();
+        try {
+          const { rawOutputButton: rawOutputButtonRevert } = await ensureMoreActionsMenuOpen();
+          rawOutputButtonRevert.click();
           await sleep(CONFIG.ELEMENT_LOAD_DELAY);
 
-          const rawOutputButtonRevert = document.querySelector('button[aria-label="Toggle viewing raw output"]');
-          if (rawOutputButtonRevert) {
-            rawOutputButtonRevert.click();
-            await sleep(CONFIG.ELEMENT_LOAD_DELAY);
-
-            // Verify that raw mode was disabled successfully
-            const rawModeAfterRevert = isRawModeEnabled();
-            console.log(`Raw mode after revert: ${rawModeAfterRevert ? 'ON' : 'OFF'}`);
-            if (rawModeAfterRevert) {
-              console.warn('Warning: Failed to disable raw output mode');
-            }
+          // Verify that raw mode was disabled successfully
+          const rawModeAfterRevert = isRawModeEnabled();
+          console.log(`Raw mode after revert: ${rawModeAfterRevert ? 'ON' : 'OFF'}`);
+          if (rawModeAfterRevert) {
+            console.warn('Warning: Failed to disable raw output mode');
           }
+        } catch (revertError) {
+          console.warn('Warning: Failed to revert raw output mode', revertError);
+        } finally {
+          await closeMoreActionsMenuIfOpen();
         }
       }
 
@@ -713,14 +742,38 @@
 
   // Listen for messages from popup
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const senderUrl = sender?.url;
+    const isInternalMessage = sender?.id === chrome.runtime.id &&
+      (!senderUrl || senderUrl.startsWith(chrome.runtime.getURL('')));
+
+    if (!isInternalMessage) {
+      sendResponse?.({ success: false, message: 'Invalid sender' });
+      return false;
+    }
+
+    if (!request || typeof request !== 'object' || Array.isArray(request) || typeof request.action !== 'string') {
+      sendResponse?.({ success: false, message: 'Invalid request' });
+      return false;
+    }
+
+    if (!ALLOWED_ACTIONS.has(request.action)) {
+      sendResponse({ success: false, message: 'Unsupported action' });
+      return false;
+    }
+
     if (request.action === 'export') {
       exportConversation().then(sendResponse);
       return true; // Will respond asynchronously
-    } else if (request.action === 'getStatus') {
-      sendResponse({ isExporting });
-    } else if (request.action === 'cancel') {
-      shouldCancel = true;
-      sendResponse({ success: true });
     }
-  }); console.log('AI Studio Exporter content script loaded');
+
+    if (request.action === 'getStatus') {
+      sendResponse({ isExporting });
+      return false;
+    }
+
+    shouldCancel = true;
+    sendResponse({ success: true });
+    return false;
+  });
+
 })();
