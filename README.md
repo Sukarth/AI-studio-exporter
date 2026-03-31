@@ -100,9 +100,7 @@ Contributions are welcome! We appreciate any help, from reporting bugs to submit
 
 ## 🐛 Troubleshooting & known issues
 
-- **Exported markdown file is missing formatting and spacing for messages**: This is a known issue. We are working on a fix. 
-    - **Workaround**: refresh the AI Studio page and ensure that when the page is fully loaded, raw mode is turned off by default. If not, turn it off manually and then reload the page.
-    - **Note**: Ensure the page is fully loaded before starting the export!
+-   **Exported markdown file is missing formatting, spacing and/or text for messages**: Ensure the page is fully loaded before starting the export! If the issue persists, check the browser's developer console (F12) for errors and open a GitHub issue.
 -   **Export button is disabled or "Not on AI Studio" message**: Make sure you are on a valid AI Studio conversation page and that the page has fully loaded. Try refreshing the page.
 -   **Export fails or hangs**: Wait for the AI Studio page to load completely before starting the export. If the issue persists, check the browser's developer console (F12) for errors and open a GitHub issue.
 
