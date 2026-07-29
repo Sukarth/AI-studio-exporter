@@ -2,307 +2,290 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio Exporter Settings</title>
-    <style>
-        :root {
-            --bg-color: #1a1b1e;
-            --card-bg: #25262b;
-            --text-primary: #e9ecef;
-            --text-secondary: #a5a5a5;
-            --accent-color: #667eea;
-            --accent-hover: #5a6fd6;
-            --border-color: #2c2e33;
-            --input-bg: #2c2e33;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Studio Exporter — Settings</title>
+  <style>
+    :root {
+      --bg: #1a1b1e;
+      --card: #25262b;
+      --text: #e9ecef;
+      --muted: #a5a5a5;
+      --accent: #667eea;
+      --border: #2c2e33;
+    }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            line-height: 1.6;
-            padding: 40px 20px;
-        }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      padding: 32px 16px 64px;
+    }
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
+    main { max-width: 680px; margin: 0 auto; }
 
-        .header {
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 20px;
-        }
+    h1 {
+      font-size: 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
 
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
+    .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
 
-        .subtitle {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 18px;
+    }
 
-        .card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 20px;
-            border: 1px solid var(--border-color);
-        }
+    section h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    section .hint { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
 
-        .section-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: var(--accent-color);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    .row {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      padding: 9px 0;
+      border-top: 1px solid var(--border);
+    }
+    .row:first-of-type { border-top: none; }
 
-        .setting-group {
-            margin-bottom: 20px;
-        }
+    .row input[type="checkbox"] { margin-top: 3px; width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+    .row label { flex: 1; cursor: pointer; font-size: 13.5px; }
+    .row label small { display: block; color: var(--muted); font-size: 12px; }
 
-        .setting-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-        }
+    .sub-options { margin-left: 26px; padding-left: 12px; border-left: 2px solid var(--border); }
 
-        .setting-label {
-            font-size: 14px;
-        }
+    .field { margin-top: 14px; }
+    .field > span { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 5px; }
 
-        .sub-setting {
-            margin-left: 28px;
-            margin-bottom: 8px;
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
+    select, input[type="number"], input[type="text"] {
+      width: 100%;
+      padding: 9px 11px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 13.5px;
+      font-family: inherit;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--accent); }
 
-        /* Toggle Switch */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 44px;
-            height: 24px;
-        }
+    button {
+      padding: 9px 16px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { border-color: var(--accent); }
+    button.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: #fff; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
 
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
+    .actions { display: flex; gap: 10px; margin-top: 12px; }
 
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #373a40;
-            transition: .4s;
-            border-radius: 24px;
-        }
+    .inline { display: flex; gap: 10px; align-items: flex-end; }
+    .inline .field { flex: 1; margin-top: 0; }
 
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
+    .badge {
+      font-size: 10px; font-weight: 700; letter-spacing: .05em;
+      padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 7px;
+      background: rgba(102,126,234,.18); color: #a5b4fc; border: 1px solid rgba(102,126,234,.35);
+    }
+    .badge.ok { background: rgba(43,138,62,.18); color: #69db7c; border-color: rgba(43,138,62,.4); }
 
-        input:checked+.slider {
-            background-color: var(--accent-color);
-        }
+    .notice { padding: 10px 12px; border-radius: 7px; font-size: 12.5px; margin-top: 12px; display: none; }
+    .notice.success { display: block; background: rgba(43,138,62,.15); color: #69db7c; border: 1px solid rgba(43,138,62,.3); }
+    .notice.error { display: block; background: rgba(201,42,42,.15); color: #ff8787; border: 1px solid rgba(201,42,42,.3); }
+    .notice.info { display: block; background: rgba(102,126,234,.12); color: #a5b4fc; border: 1px solid rgba(102,126,234,.3); }
 
-        input:focus+.slider {
-            box-shadow: 0 0 1px var(--accent-color);
-        }
+    .locked { opacity: .5; pointer-events: none; }
 
-        input:checked+.slider:before {
-            transform: translateX(20px);
-        }
+    .toast {
+      position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: #2b8a3e; color: #fff; padding: 11px 20px; border-radius: 8px;
+      font-size: 13px; font-weight: 500; transition: transform .25s ease; z-index: 50;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
 
-        /* Number Input */
-        .number-input {
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 8px 12px;
-            border-radius: 6px;
-            width: 100px;
-            font-size: 14px;
-        }
-
-        .number-input:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
-
-        .actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-            margin-top: 30px;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: none;
-        }
-
-        .btn-primary {
-            background-color: var(--accent-color);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-        }
-
-        .btn-secondary {
-            background-color: transparent;
-            color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--input-bg);
-            color: var(--text-primary);
-        }
-
-        .status-msg {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 12px 24px;
-            border-radius: 8px;
-            background-color: #2b8a3e;
-            color: white;
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-
-        .status-msg.show {
-            opacity: 1;
-        }
-    </style>
+    footer { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 26px; }
+    footer a { color: var(--muted); }
+  </style>
 </head>
 
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Settings</h1>
-            <p class="subtitle">Configure how AI Studio Exporter behaves</p>
+  <main>
+    <h1>AI Studio Exporter</h1>
+    <p class="subtitle">
+      Settings are stored in your browser and sync with your Chrome profile.
+      Nothing about your conversations is ever sent anywhere.
+    </p>
+
+    <section>
+      <h2>Pro <span id="proBadge" class="badge">LOCKED</span></h2>
+      <p class="hint">
+        Extra formats, whole-library export and scheduled backups. One payment, no subscription.
+      </p>
+
+      <div class="inline">
+        <label class="field" for="licenseKey">
+          <span>Licence key</span>
+          <input type="text" id="licenseKey" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" autocomplete="off" spellcheck="false">
+        </label>
+        <button id="activateBtn" class="primary">Activate</button>
+      </div>
+      <div class="actions">
+        <button id="buyBtn">Get a licence</button>
+        <button id="deactivateBtn" hidden>Remove from this browser</button>
+      </div>
+      <div id="licenseNotice" class="notice"></div>
+    </section>
+
+    <section>
+      <h2>Export defaults</h2>
+      <p class="hint">Used by the popup and by scheduled backups.</p>
+
+      <label class="field" for="defaultFormat">
+        <span>Default format</span>
+        <select id="defaultFormat"></select>
+      </label>
+    </section>
+
+    <section>
+      <h2>What to include</h2>
+      <p class="hint">
+        The API exposes far more than the page shows. Turn off anything you would
+        rather keep out of your exports.
+      </p>
+
+      <div class="row">
+        <input type="checkbox" id="scrapeReasoning">
+        <label for="scrapeReasoning">Model reasoning
+          <small>Thinking shown before the answer, kept as its own message.</small></label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="includeModelConfig">
+        <label for="includeModelConfig">Model settings
+          <small>Model name, temperature, top-P, top-K and output limit.</small></label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="includeSystemInstruction">
+        <label for="includeSystemInstruction">System instruction</label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="includeTimestamps">
+        <label for="includeTimestamps">Timestamps</label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="includeTokenCounts">
+        <label for="includeTokenCounts">Token counts</label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="includeSourceUrl">
+        <label for="includeSourceUrl">Link back to the conversation</label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Attachments</h2>
+      <p class="hint">Files are fetched from Drive, so exports contain the real thing rather than a thumbnail.</p>
+
+      <div class="row">
+        <input type="checkbox" id="scrapeImages">
+        <label for="scrapeImages">Images</label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="scrapeAttachments">
+        <label for="scrapeAttachments">Files and documents</label>
+      </div>
+      <div id="attachmentOptions" class="sub-options">
+        <div class="row">
+          <input type="checkbox" id="scrapeAttachmentTitle">
+          <label for="scrapeAttachmentTitle">File names</label>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="scrapeAttachmentSize">
+          <label for="scrapeAttachmentSize">File sizes</label>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="scrapeAttachmentPreview">
+          <label for="scrapeAttachmentPreview">Thumbnails
+            <small>Only used when the page is scraped as a fallback.</small></label>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Scheduled backup <span class="badge">PRO</span></h2>
+      <p class="hint">
+        Backs up only what changed since last time, so a routine run is quick.
+        Chrome must be running when one is due.
+      </p>
+
+      <div id="backupControls">
+        <div class="row">
+          <input type="checkbox" id="backupEnabled">
+          <label for="backupEnabled">Back up my library automatically</label>
         </div>
 
-        <div class="card">
-            <div class="section-title">Content Extraction</div>
-
-            <div class="setting-group">
-                <div class="setting-item">
-                    <span class="setting-label">Scrape Images</span>
-                    <label class="switch">
-                        <input type="checkbox" id="scrapeImages">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="setting-group">
-                <div class="setting-item">
-                    <span class="setting-label">Scrape Attachments</span>
-                    <label class="switch">
-                        <input type="checkbox" id="scrapeAttachments">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div id="attachmentOptions">
-                    <div class="setting-item sub-setting">
-                        <span class="setting-label">Include Preview Images</span>
-                        <label class="switch">
-                            <input type="checkbox" id="scrapeAttachmentPreview">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-item sub-setting">
-                        <span class="setting-label">Include File Name</span>
-                        <label class="switch">
-                            <input type="checkbox" id="scrapeAttachmentTitle">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-item sub-setting">
-                        <span class="setting-label">Include File Size/Info</span>
-                        <label class="switch">
-                            <input type="checkbox" id="scrapeAttachmentSize">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="setting-group">
-                <div class="setting-item">
-                    <span class="setting-label">Scrape Reasoning Content</span>
-                    <label class="switch">
-                        <input type="checkbox" id="scrapeReasoning">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
+        <div class="inline">
+          <label class="field" for="backupFrequency">
+            <span>How often</span>
+            <select id="backupFrequency">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </label>
+          <label class="field" for="backupFormat">
+            <span>Format</span>
+            <select id="backupFormat"></select>
+          </label>
+          <button id="runBackupBtn">Run now</button>
         </div>
+      </div>
+      <div id="backupNotice" class="notice"></div>
+    </section>
 
-        <div class="card">
-            <div class="section-title">Performance</div>
+    <section>
+      <h2>Advanced</h2>
+      <p class="hint">
+        Only used when the API is unavailable and the page has to be scraped instead.
+      </p>
+      <label class="field" for="loadDelay">
+        <span>Page load delay (ms)</span>
+        <input type="number" id="loadDelay" min="200" max="5000" step="50">
+      </label>
+    </section>
 
-            <div class="setting-item">
-                <div>
-                    <span class="setting-label">Element Load Delay (ms)</span>
-                    <div class="subtitle" style="font-size: 12px; margin-top: 4px;">Increase this if exports are missing
-                        content</div>
-                </div>
-                <input type="number" id="loadDelay" class="number-input" min="200" step="100">
-            </div>
-        </div>
-
-        <div class="actions">
-            <button id="resetBtn" class="btn btn-secondary">Reset to Defaults</button>
-            <button id="saveBtn" class="btn btn-primary">Save Settings</button>
-        </div>
+    <div class="actions">
+      <button id="saveBtn" class="primary">Save settings</button>
+      <button id="resetBtn">Reset to defaults</button>
     </div>
 
-    <div id="statusMsg" class="status-msg">Settings saved successfully</div>
+    <footer>
+      v<span id="version"></span> &middot;
+      <a href="https://github.com/Sukarth/AI-studio-exporter" target="_blank" rel="noopener noreferrer">Open source on GitHub</a>
+    </footer>
+  </main>
 
-    <script src="settings.js"></script>
-    <script src="options.js"></script>
+  <div id="toast" class="toast"></div>
+
+  <script src="settings.js"></script>
+  <script src="pro/license.js"></script>
+  <script src="options.js"></script>
 </body>
 
 </html>

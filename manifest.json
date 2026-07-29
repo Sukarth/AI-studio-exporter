@@ -7,7 +7,8 @@
     "activeTab",
     "scripting",
     "downloads",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "options_page": "options.html",
   "host_permissions": [
@@ -65,6 +66,8 @@
         "pro/formats/obsidian.js",
         "vendor/pro-documents.bundle.js",
         "src/export.js",
+        "pro/license.js",
+        "pro/batch.js",
         "content.js"
       ],
       "run_at": "document_idle"
