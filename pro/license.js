@@ -28,6 +28,12 @@
 
   const KEY_PATTERN = /^[A-Za-z0-9-]{8,128}$/;
 
+  // settings.js is always loaded first, in every context that loads this file.
+  // Read at call time rather than at load, so the guard below is what reports a
+  // missing configuration instead of a ReferenceError at startup.
+  const organizationId = () =>
+    (typeof AI_STUDIO_PRO !== 'undefined' && AI_STUDIO_PRO.polarOrganizationId) || '';
+
   function readStored() {
     return new Promise((resolve) => {
       chrome.storage.local.get({ [STORAGE_KEY]: null }, (data) => resolve(data[STORAGE_KEY] || null));
@@ -78,16 +84,24 @@
    * Activate a licence key. Called once, from the options page.
    * @returns {Promise<{ok: boolean, message: string}>}
    */
-  async function activate(rawKey, organizationId) {
+  async function activate(rawKey) {
     const key = String(rawKey || '').trim();
     if (!KEY_PATTERN.test(key)) {
       return { ok: false, message: 'That does not look like a licence key.' };
+    }
+    // Polar rejects a request with no organisation with an opaque error; say
+    // what is actually wrong instead of blaming the key.
+    if (!organizationId()) {
+      return {
+        ok: false,
+        message: 'This build has no store configured (AI_STUDIO_PRO.polarOrganizationId in settings.js).',
+      };
     }
 
     try {
       const result = await callPolar('activate', {
         key,
-        organization_id: organizationId,
+        organization_id: organizationId(),
         label: 'AI Studio Exporter',
         meta: { installation: await installationId() },
       });
@@ -128,7 +142,7 @@
     try {
       const result = await callPolar('validate', {
         key: stored.key,
-        organization_id: (options && options.organizationId) || undefined,
+        organization_id: organizationId(),
         activation_id: stored.activationId || undefined,
       });
 

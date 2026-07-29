@@ -7,8 +7,6 @@
  * @license MIT
  */
 
-const PURCHASE_URL = 'https://github.com/Sukarth/AI-studio-exporter#pro';
-
 document.addEventListener('DOMContentLoaded', async () => {
   const el = {
     status: document.getElementById('status'),
@@ -42,7 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   el.upgrade.addEventListener('click', (event) => {
     event.preventDefault();
-    chrome.tabs.create({ url: PURCHASE_URL });
+    chrome.tabs.create({ url: AI_STUDIO_PRO.purchaseUrl });
   });
 
   // --- format picker ----------------------------------------------------

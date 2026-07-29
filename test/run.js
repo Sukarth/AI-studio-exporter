@@ -412,6 +412,35 @@ test('source files contain no literal control characters', () => {
   assert.deepStrictEqual(dirty.map((f) => path.relative(ROOT, f)), [], 'files with control characters');
 });
 
+test('manifest host permissions cover every origin the code fetches', () => {
+  // A missing host permission is a CORS failure at runtime with a message that
+  // points at the wrong thing entirely.
+  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+  const granted = manifest.host_permissions.map((p) => new URL(p.replace(/\*$/, '')).origin);
+
+  // Only files that fetch with the extension's own privileges. src/api/rpc.js
+  // is deliberately absent: it runs in the page's MAIN world, so its requests
+  // to MakerSuite and Drive are page-origin requests governed by those APIs'
+  // CORS headers. Granting host permissions for them would be asking for
+  // access the extension does not use.
+  const sources = ['pro/license.js', 'background.js', 'pro/schedule.js']
+    .map((f) => path.join(ROOT, f))
+    .filter((f) => fs.existsSync(f));
+
+  const wanted = new Set();
+  for (const file of sources) {
+    const code = fs.readFileSync(file, 'utf8');
+    for (const match of code.matchAll(/https:\/\/([a-z0-9.-]+)/gi)) {
+      const origin = `https://${match[1]}`;
+      // Only origins the extension actually calls, not ones it merely names.
+      if (/googleapis\.com|polar\.sh|clients6\.google\.com/.test(origin)) wanted.add(origin);
+    }
+  }
+
+  const missing = [...wanted].filter((origin) => !granted.includes(origin));
+  assert.deepStrictEqual(missing, [], 'origins fetched without a host permission');
+});
+
 test('every element the popup and options pages reach for exists in their HTML', () => {
   // Extension pages cannot be driven by devtools automation, so a typo'd id
   // shows up as a silent null.addEventListener at boot with nothing in the

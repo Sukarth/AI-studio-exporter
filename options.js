@@ -7,8 +7,6 @@
  * @license MIT
  */
 
-const PURCHASE_URL = 'https://github.com/Sukarth/AI-studio-exporter#pro';
-
 // Every boolean setting is rendered as a checkbox of the same id, so the
 // bindings are derived rather than listed twice.
 const CHECKBOX_SETTINGS = Object.keys(AI_STUDIO_DEFAULT_SETTINGS).filter(
@@ -207,7 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   el('activateBtn').addEventListener('click', activate);
   el('deactivateBtn').addEventListener('click', deactivate);
-  el('buyBtn').addEventListener('click', () => chrome.tabs.create({ url: PURCHASE_URL }));
+  el('buyBtn').addEventListener('click', () => chrome.tabs.create({ url: AI_STUDIO_PRO.purchaseUrl }));
 
   el('backupEnabled').addEventListener('change', saveBackupState);
   el('backupFrequency').addEventListener('change', saveBackupState);

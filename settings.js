@@ -7,6 +7,18 @@
  * @license MIT
  */
 
+/**
+ * Storefront configuration — the only place either value is written down.
+ *
+ * Both are public by design. The organisation id names which Polar store to
+ * ask about a key; it grants nothing on its own, which is why it can sit in an
+ * open repository without weakening anything.
+ */
+const AI_STUDIO_PRO = Object.freeze({
+  purchaseUrl: 'https://github.com/Sukarth/AI-studio-exporter#pro',
+  polarOrganizationId: '',
+});
+
 const AI_STUDIO_DEFAULT_SETTINGS = Object.freeze({
   // Content capture
   scrapeImages: true,

@@ -12,7 +12,8 @@
   ],
   "options_page": "options.html",
   "host_permissions": [
-    "https://aistudio.google.com/*"
+    "https://aistudio.google.com/*",
+    "https://api.polar.sh/*"
   ],
   "action": {
     "default_popup": "popup.html",

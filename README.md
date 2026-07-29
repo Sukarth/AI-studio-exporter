@@ -144,7 +144,7 @@ CSV and JSONL exports skip the folder structure and produce one dataset file for
 | `downloads` | Save the export |
 | `storage` | Remember your settings and licence |
 | `alarms` | Scheduled backups |
-| `host_permissions` | `aistudio.google.com` only |
+| `host_permissions` | `aistudio.google.com`, and `api.polar.sh` for the one-time licence check |
 
 ## 🐛 Troubleshooting
 
