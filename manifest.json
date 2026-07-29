@@ -59,6 +59,10 @@
         "src/formats/markdown.js",
         "src/formats/json.js",
         "src/formats/text.js",
+        "pro/formats/jsonl.js",
+        "pro/formats/csv.js",
+        "pro/formats/html.js",
+        "pro/formats/obsidian.js",
         "src/export.js",
         "content.js"
       ],

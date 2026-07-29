@@ -37,7 +37,11 @@ load(
   'src/formats/markdown.js',
   'src/formats/json.js',
   'src/formats/text.js',
-  'src/export.js'
+  'src/export.js',
+  'pro/formats/jsonl.js',
+  'pro/formats/csv.js',
+  'pro/formats/html.js',
+  'pro/formats/obsidian.js'
 );
 
 const { AISE } = globalThis;
@@ -416,6 +420,116 @@ test('asset planning skips parts that have no bytes', () => {
   // Only the inline attachment carries data; the drive-referenced one does not.
   const { files } = planAssets(c);
   assert.strictEqual(files.length, 1, 'unfetched drive refs are not archive entries');
+});
+
+// --- pro formatters -----------------------------------------------------
+
+test('jsonl emits one training example in the messages format', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const lines = AISE.formats.jsonl.render(c, ALL_ON).trim().split('\n');
+  assert.strictEqual(lines.length, 1);
+  const parsed = JSON.parse(lines[0]);
+  assert.ok(Array.isArray(parsed.messages));
+  assert.ok(parsed.messages.some((m) => m.role === 'assistant'));
+});
+
+test('jsonl excludes reasoning unless explicitly opted in', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  // Training on private thinking as if it were the reply teaches the model to
+  // emit thinking as output.
+  const without = JSON.parse(AISE.formats.jsonl.render(c, ALL_ON));
+  assert.ok(!JSON.stringify(without).includes('The user wants arithmetic.'));
+
+  const with_ = JSON.parse(AISE.formats.jsonl.render(c, Object.assign({}, ALL_ON, { jsonlIncludeReasoning: true })));
+  assert.ok(JSON.stringify(with_).includes('The user wants arithmetic.'));
+});
+
+test('jsonl merges consecutive same-role turns', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const messages = AISE.formats.jsonl.toMessages(c, { includeReasoning: false });
+  for (let i = 1; i < messages.length; i++) {
+    assert.notStrictEqual(messages[i].role, messages[i - 1].role, 'roles must alternate');
+  }
+});
+
+test('jsonl skips a conversation with no assistant reply', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  c.turns = c.turns.filter((t) => t.role === 'user');
+  assert.strictEqual(AISE.formats.jsonl.render(c, ALL_ON), '');
+});
+
+test('csv neutralises formula injection', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  c.turns[0].text = '=cmd|/c calc!A1';
+  const csv = AISE.formats.csv.render(c, ALL_ON);
+  assert.ok(csv.includes('"\'=cmd'), 'leading = is prefixed so Excel treats it as text');
+});
+
+test('csv quotes embedded quotes and newlines', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  c.turns[0].text = 'say "hi"\nthen stop';
+  const csv = AISE.formats.csv.render(c, ALL_ON);
+  assert.ok(csv.includes('""hi""'), 'quotes are doubled per RFC 4180');
+});
+
+test('html escapes message content rather than rendering it', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  c.turns[0].text = '<script>alert(1)</script>';
+  const html = AISE.formats.html.render(c, ALL_ON, new Map());
+  assert.ok(!html.includes('<script>alert(1)</script>'), 'no live script element');
+  assert.ok(html.includes('&lt;script&gt;'), 'shown as text instead');
+});
+
+test('html refuses javascript: links from message text', () => {
+  const escaped = AISE.formats.html.escapeHtml('[click](javascript:alert(1))');
+  const rendered = AISE.formats.html.renderMarkdown(escaped);
+  assert.ok(!/href="javascript:/i.test(rendered), 'only http(s) links become anchors');
+});
+
+test('html renders fenced code without letting it escape the block', () => {
+  const escaped = AISE.formats.html.escapeHtml('```js\nconst a = 1 < 2;\n```');
+  const rendered = AISE.formats.html.renderMarkdown(escaped);
+  assert.ok(rendered.includes('<pre'), 'fence became a pre block');
+  assert.ok(rendered.includes('&lt;'), 'angle bracket stayed escaped');
+});
+
+test('html output is a complete standalone document', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const html = AISE.formats.html.render(c, ALL_ON, new Map());
+  assert.ok(html.startsWith('<!DOCTYPE html>'));
+  assert.ok(html.includes('<style>'), 'CSS is inlined');
+  assert.ok(!/<(script|link)\b[^>]*\bsrc=|<link\b[^>]*\bhref="http/i.test(html), 'nothing loaded externally');
+});
+
+test('obsidian frontmatter survives a title containing quotes', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  c.title = 'He said "hello": a study';
+  const md = AISE.formats.obsidian.render(c, ALL_ON, new Map());
+  const frontmatter = md.split('---')[1];
+  assert.ok(frontmatter.includes('\\"hello\\"'), 'quotes escaped inside the YAML scalar');
+});
+
+test('obsidian wraps reasoning in a collapsed callout', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const md = AISE.formats.obsidian.render(c, ALL_ON, new Map());
+  assert.ok(md.includes('> [!note]- 🧠 Reasoning'));
+});
+
+test('obsidian links attachments by vault basename, not archive path', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const part = c.turns.flatMap((t) => t.parts)[0];
+  const md = AISE.formats.obsidian.render(c, ALL_ON, new Map([[part, 'attachments/photo.png']]));
+  assert.ok(md.includes('[[photo.png]]'), 'basename only');
+  assert.ok(!md.includes('[[attachments/photo.png]]'));
+});
+
+test('every pro format is flagged pro and every free format is not', () => {
+  for (const id of ['markdown', 'json', 'text']) {
+    assert.strictEqual(AISE.formats[id].pro, false, `${id} must stay free`);
+  }
+  for (const id of ['jsonl', 'csv', 'html', 'obsidian']) {
+    assert.strictEqual(AISE.formats[id].pro, true, `${id} must be gated`);
+  }
 });
 
 // --- report -------------------------------------------------------------
