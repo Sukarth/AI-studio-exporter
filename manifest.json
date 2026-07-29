@@ -55,6 +55,7 @@
         "src/model.js",
         "src/api/decode.js",
         "src/api/bridge.js",
+        "src/api/attachments.js",
         "content.js"
       ],
       "run_at": "document_idle"

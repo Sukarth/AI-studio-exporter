@@ -1,5 +1,5 @@
 /**
- * Isolated-world half of the RPC bridge.
+ * Isolated-world half of the transport bridge.
  *
  * src/api/rpc.js does the actual fetching from the MAIN world because of CORS;
  * this side wraps that in promises and exposes a normal-looking async API to
@@ -14,10 +14,12 @@
 
   const REQUEST_TAG = 'aise:rpc:request';
   const RESPONSE_TAG = 'aise:rpc:response';
-  const TIMEOUT_MS = 30000;
+  const DEFAULT_TIMEOUT_MS = 30000;
+  // Attachments can be large and Drive can be slow; give them their own budget.
+  const DOWNLOAD_TIMEOUT_MS = 180000;
   const PAGE_SIZE = 100;
-  // ListPrompts paginates; this only bounds a runaway loop if the server keeps
-  // handing back tokens. 200 pages is 20k conversations.
+  // Only bounds a runaway loop if the server keeps handing back page tokens.
+  // 200 pages is 20k conversations.
   const MAX_PAGES = 200;
 
   const pending = new Map();
@@ -34,23 +36,25 @@
     clearTimeout(entry.timer);
 
     if (data.ok) entry.resolve(data.result);
-    else entry.reject(new Error(data.error || 'RPC failed'));
+    else entry.reject(new Error(data.error || 'Request failed'));
   });
 
-  function call(method, body) {
+  function send(payload, timeoutMs) {
     return new Promise((resolve, reject) => {
       const id = `${Date.now()}-${counter++}`;
       const timer = setTimeout(() => {
         pending.delete(id);
-        reject(new Error(`${method} timed out after ${TIMEOUT_MS}ms`));
-      }, TIMEOUT_MS);
+        reject(new Error(`${payload.op} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
 
       pending.set(id, { resolve, reject, timer });
-      window.postMessage({ tag: REQUEST_TAG, id, method, body }, location.origin);
+      window.postMessage(Object.assign({ tag: REQUEST_TAG, id }, payload), location.origin);
     });
   }
 
-  /** True when the MAIN-world half is present and authenticated. */
+  const call = (method, body) => send({ op: 'rpc', method, body }, DEFAULT_TIMEOUT_MS);
+
+  /** True when the MAIN-world half is present and the session is authenticated. */
   async function isAvailable() {
     try {
       await call('ListPrompts', [1]);
@@ -65,7 +69,7 @@
   }
 
   /**
-   * Walk the whole library. `onPage` is invoked per page so callers can show
+   * Walk the whole library. `onPage` fires per page so callers can show
    * progress before the full listing has arrived.
    */
   async function listAllPrompts(onPage) {
@@ -86,5 +90,18 @@
     return all;
   }
 
-  AISE.api = { call, isAvailable, fetchConversation, listAllPrompts };
+  const fetchAttachmentMetadata = (fileId) =>
+    send({ op: 'drive.metadata', fileId }, DEFAULT_TIMEOUT_MS);
+
+  const downloadAttachment = (fileId) =>
+    send({ op: 'drive.download', fileId }, DOWNLOAD_TIMEOUT_MS);
+
+  AISE.api = {
+    call,
+    isAvailable,
+    fetchConversation,
+    listAllPrompts,
+    fetchAttachmentMetadata,
+    downloadAttachment,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

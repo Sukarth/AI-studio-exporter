@@ -27,6 +27,7 @@ function load(...relativePaths) {
 load(
   'src/model.js',
   'src/api/decode.js',
+  'src/api/attachments.js',
   'src/formats/markdown.js',
   'src/formats/json.js',
   'src/formats/text.js'
@@ -244,6 +245,35 @@ test('text output carries no markdown markup', () => {
   assert.ok(txt.includes('MODEL (REASONING)'));
   assert.ok(txt.includes('Arithmetic Chat'));
   assert.ok(!txt.includes('<!--'), 'no HTML comment delimiters in plain text');
+});
+
+// --- attachment naming --------------------------------------------------
+
+const { chooseFilename } = AISE.attachments;
+
+test('keeps a filename that already has a usable extension', () => {
+  assert.strictEqual(chooseFilename('notes.pdf', 'application/pdf', null), 'notes.pdf');
+});
+
+test('appends an extension derived from MIME when the name lacks one', () => {
+  assert.strictEqual(chooseFilename('notes', 'text/markdown', null), 'notes.md');
+  assert.strictEqual(chooseFilename('sheet', 'text/csv', null), 'sheet.csv');
+});
+
+test('rewrites the extension when a native doc was exported to another format', () => {
+  // A Google Doc named "Report" exported as PDF must not be saved as "Report.md".
+  assert.strictEqual(chooseFilename('Report.gdoc', 'application/pdf', 'pdf'), 'Report.pdf');
+  assert.strictEqual(chooseFilename('Report', 'text/markdown', 'md'), 'Report.md');
+});
+
+test('strips path separators that would escape the archive directory', () => {
+  const name = chooseFilename('../../etc/passwd', 'text/plain', null);
+  assert.ok(!name.includes('/'), 'no forward slash survives');
+  assert.ok(!name.includes('\\'), 'no backslash survives');
+});
+
+test('falls back to a generic name and extension for unknown types', () => {
+  assert.strictEqual(chooseFilename('', 'application/x-unknown-thing', null), 'attachment.bin');
 });
 
 // --- report -------------------------------------------------------------
