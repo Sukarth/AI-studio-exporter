@@ -79,9 +79,25 @@ function wirePrompt() {
     return Object.assign(t, over);
   };
 
+  // Streamed chunk. Index 1 is the text; index 12 marks it as reasoning.
+  const part = (text, thought) => {
+    const p = new Array(15).fill(null);
+    p[1] = text;
+    if (thought) p[12] = 1;
+    return p;
+  };
+
   const userTurn = turn({ 0: 'What is 2+2?', 18: 5, 32: [1784274199, 457000000] });
-  const thoughtTurn = turn({ 0: 'The user wants arithmetic.', 8: 'model', 16: 1, 18: 11, 32: [1784274200, 0] });
-  const modelTurn = turn({ 0: 'It is 4.', 8: 'model', 18: 7, 32: [1784274201, 0] });
+  // Reasoning: turn-level flag 16 is absent, and every part is marked.
+  const thoughtTurn = turn({
+    0: 'The user wants arithmetic.', 8: 'model', 18: 11,
+    29: [part('The user wants arithmetic.', true)], 32: [1784274200, 0],
+  });
+  // Answer: flag 16 is set. Its polarity marks answers, not thoughts.
+  const modelTurn = turn({
+    0: 'It is 4.', 8: 'model', 16: 1, 18: 7,
+    29: [part('It is 4.', false)], 32: [1784274201, 0],
+  });
   const attachmentTurn = turn({ 3: ['1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7'], 18: 900 });
   const inlineFileTurn = turn({ 23: ['image/png', 'aGVsbG8='], 18: 12 });
   const emptyDraft = turn({ 0: '' });
@@ -138,6 +154,37 @@ test('separates thought turns from answers', () => {
   // the answer. Both survive as distinct turns.
   assert.strictEqual(thoughts[0].text, 'The user wants arithmetic.');
   assert.strictEqual(answers[0].text, 'It is 4.');
+});
+
+test('does not mistake an answer for reasoning when parts are absent', () => {
+  // Observed live: a short exchange whose only model turn carries flag 16 and
+  // holds the answer. Reading flag 16 as isThought filed every answer under
+  // reasoning, which is exactly what the first real export produced.
+  const bare = new Array(36).fill(null);
+  bare[8] = 'model';
+  bare[16] = 1;
+  bare[0] = 'aistudio-ok-3';
+  const prompt = new Array(14).fill(null);
+  prompt[0] = 'prompts/X';
+  prompt[13] = [[bare], []];
+
+  const c = AISE.decode.decodeConversation([prompt]);
+  assert.strictEqual(c.turns.length, 1);
+  assert.strictEqual(c.turns[0].isThought, false, 'flag 16 marks the answer, not a thought');
+  assert.strictEqual(c.stats.modelTurns, 1);
+  assert.strictEqual(c.stats.thoughtTurns, 0);
+});
+
+test('treats a partless model turn without flag 16 as reasoning', () => {
+  const bare = new Array(36).fill(null);
+  bare[8] = 'model';
+  bare[0] = 'Thinking about it.';
+  const prompt = new Array(14).fill(null);
+  prompt[0] = 'prompts/X';
+  prompt[13] = [[bare], []];
+
+  const c = AISE.decode.decodeConversation([prompt]);
+  assert.strictEqual(c.turns[0].isThought, true);
 });
 
 test('drops the trailing empty draft turn', () => {

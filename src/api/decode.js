@@ -51,7 +51,9 @@
     DRIVE_REF_ALT: 1, // [driveId] — seen rarely
     DRIVE_REF: 3,     // [driveId] — attachment reference
     ROLE: 8,          // "user" | "model"
-    IS_THOUGHT: 16,   // 1 when this turn is model reasoning
+    // 1 on a model turn that is the answer; unset on one that is reasoning.
+    // Note the polarity: this marks answers, not thoughts.
+    ANSWER_FLAG: 16,
     TOKEN_COUNT: 18,
     INLINE_FILE: 23,  // [nameOrMime, base64Data]
     PARTS: 29,        // streamed chunks, each [_, text, ...]
@@ -59,6 +61,8 @@
   };
 
   const PART_TEXT = 1;
+  // 1 on a part that belongs to the model's reasoning rather than its answer.
+  const PART_THOUGHT = 12;
 
   // --- tolerant accessors -------------------------------------------------
   // Every one of these returns a fallback rather than throwing, so a renumbered
@@ -146,10 +150,28 @@
     return parts;
   }
 
+  /**
+   * Decide whether a model turn holds reasoning or the answer.
+   *
+   * Prefer the part-level marker, which states it directly: a turn whose parts
+   * are all flagged as thoughts is reasoning. Fall back to the turn-level flag,
+   * whose polarity is the trap here — it is set on answers, so its absence
+   * means reasoning. Reading it as an isThought flag inverts every model turn
+   * and files answers under reasoning.
+   */
+  function isThoughtTurn(rawTurn, role) {
+    if (role !== 'model') return false;
+
+    const parts = arr(at(rawTurn, TURN.PARTS));
+    if (parts.length) return parts.every((part) => at(part, PART_THOUGHT) === 1);
+
+    return at(rawTurn, TURN.ANSWER_FLAG) !== 1;
+  }
+
   function decodeTurn(rawTurn) {
     const role = str(at(rawTurn, TURN.ROLE)) === 'model' ? 'model' : 'user';
     const turn = makeTurn(role, decodeText(rawTurn), {
-      isThought: at(rawTurn, TURN.IS_THOUGHT) === 1,
+      isThought: isThoughtTurn(rawTurn, role),
       tokenCount: num(at(rawTurn, TURN.TOKEN_COUNT)),
       timestamp: toEpochMs(at(rawTurn, TURN.TIMESTAMP)),
     });
