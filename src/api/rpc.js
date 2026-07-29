@@ -29,10 +29,10 @@
   const DRIVE_BASE = 'https://content.googleapis.com/drive/v3/files/';
 
   // The public web-client key shipped in the AI Studio bundle. Kept as a
-  // fallback only — findApiKey() prefers whatever the live page is using so a
-  // rotation on Google's side doesn't strand us on a stale constant.
+  // first choice, with keys discovered on the page as fallbacks so a rotation
+  // on Google's side can still be recovered from. See collectApiKeys().
   const FALLBACK_API_KEY = 'AIzaSyDdP816MREB3SkjZO04QXbjsigfcI0GWOs';
-  const API_KEY_PATTERN = /["'](AIza[\w-]{35})["']/;
+  const API_KEY_PATTERN = /["'](AIza[\w-]{35})["']/g;
 
   const REQUEST_TAG = 'aise:rpc:request';
   const RESPONSE_TAG = 'aise:rpc:response';
@@ -55,7 +55,8 @@
   };
   const NATIVE_FALLBACK = { mimeType: 'application/pdf', extension: 'pdf' };
 
-  let cachedApiKey = null;
+  let keyCandidates = null;
+  let activeKeyIndex = 0;
   let tokenCache = null; // { token, expiresAt }
 
   function readCookie(name) {
@@ -64,14 +65,44 @@
     return hit ? hit.slice(prefix.length) : null;
   }
 
-  /** Scan inline scripts for the live API key, falling back to the constant. */
-  function findApiKey() {
-    if (cachedApiKey) return cachedApiKey;
+  /**
+   * Build the ordered list of API keys to try.
+   *
+   * The page embeds keys for several unrelated Google services, so taking the
+   * first AIza match is not merely unreliable, it is reliably wrong: the first
+   * one on a prompt page is not the MakerSuite key and yields
+   * "Requests to this API are blocked". The known-good constant therefore goes
+   * first, with everything discovered on the page behind it so a rotation on
+   * Google's side can still be recovered from by falling through.
+   */
+  function collectApiKeys() {
+    if (keyCandidates) return keyCandidates;
+
+    const discovered = [];
     for (const script of document.querySelectorAll('script:not([src])')) {
-      const match = API_KEY_PATTERN.exec(script.textContent || '');
-      if (match) return (cachedApiKey = match[1]);
+      for (const match of (script.textContent || '').matchAll(API_KEY_PATTERN)) {
+        if (!discovered.includes(match[1])) discovered.push(match[1]);
+      }
     }
-    return (cachedApiKey = FALLBACK_API_KEY);
+
+    const ordered = [];
+    if (discovered.includes(FALLBACK_API_KEY)) ordered.push(FALLBACK_API_KEY);
+    for (const key of discovered) if (!ordered.includes(key)) ordered.push(key);
+    if (!ordered.includes(FALLBACK_API_KEY)) ordered.push(FALLBACK_API_KEY);
+
+    keyCandidates = ordered;
+    activeKeyIndex = 0;
+    return keyCandidates;
+  }
+
+  const currentApiKey = () => collectApiKeys()[activeKeyIndex] || FALLBACK_API_KEY;
+
+  /** Move to the next candidate. Returns false once they are exhausted. */
+  function advanceApiKey() {
+    if (activeKeyIndex + 1 >= collectApiKeys().length) return false;
+    activeKeyIndex++;
+    tokenCache = null; // the cached token was minted under the previous key
+    return true;
   }
 
   /** AI Studio puts the signed-in account index in the path as /u/<n>/. */
@@ -114,22 +145,34 @@
       throw new Error(`Refusing to call non-allowlisted RPC method: ${method}`);
     }
 
-    const response = await fetch(RPC_BASE + method, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'content-type': 'application/json+protobuf',
-        'x-goog-api-key': findApiKey(),
-        'x-goog-authuser': findAuthUser(),
-        'x-user-agent': 'grpc-web-javascript/0.1',
-        authorization: await buildAuthHeader(),
-      },
-      body: JSON.stringify(body),
-    });
+    let lastError = null;
 
-    const text = await response.text();
-    if (!response.ok) throw describeRpcError(response.status, text, method);
-    return JSON.parse(text);
+    // One attempt per candidate key. A 401/403 here almost always means the key
+    // is not authorised for this API rather than that the user is signed out,
+    // so it is worth trying the next one before giving up.
+    for (let attempt = 0; attempt < collectApiKeys().length; attempt++) {
+      const response = await fetch(RPC_BASE + method, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'content-type': 'application/json+protobuf',
+          'x-goog-api-key': currentApiKey(),
+          'x-goog-authuser': findAuthUser(),
+          'x-user-agent': 'grpc-web-javascript/0.1',
+          authorization: await buildAuthHeader(),
+        },
+        body: JSON.stringify(body),
+      });
+
+      const text = await response.text();
+      if (response.ok) return JSON.parse(text);
+
+      lastError = describeRpcError(response.status, text, method);
+      if ((response.status === 401 || response.status === 403) && advanceApiKey()) continue;
+      throw lastError;
+    }
+
+    throw lastError;
   }
 
   /**
@@ -161,7 +204,7 @@
     return response;
   }
 
-  const driveUrl = (id, query) => `${DRIVE_BASE}${encodeURIComponent(id)}${query}&key=${findApiKey()}`;
+  const driveUrl = (id, query) => `${DRIVE_BASE}${encodeURIComponent(id)}${query}&key=${currentApiKey()}`;
 
   async function driveMetadata(fileId) {
     const response = await driveFetch(
