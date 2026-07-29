@@ -4,7 +4,7 @@
   "description": "Chrome extension to export conversations from Google AI Studio with media attachments",
   "main": "background.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/run.js"
   },
   "keywords": [
     "chrome-extension",
