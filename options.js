@@ -135,8 +135,11 @@ async function activate() {
 
 async function deactivate() {
   if (!confirm('Remove the licence from this browser? You can activate it again later.')) return;
-  await AISE.license.deactivate();
+  const result = await AISE.license.deactivate();
   await refreshLicenseUI();
+  // The message differs when Polar could not be told, and that difference is
+  // the whole point of showing it: an unreleased slot counts against the limit.
+  notice('licenseNotice', 'info', result.message);
   toast('Licence removed');
 }
 

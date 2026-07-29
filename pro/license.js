@@ -120,9 +120,40 @@
     }
   }
 
+  /**
+   * Release this browser's activation, both locally and at Polar.
+   *
+   * Telling Polar matters: activations are capped per licence, so a purely
+   * local removal burns a slot forever and someone who reinstalls enough times
+   * ends up locked out of a licence they paid for.
+   *
+   * Local removal happens regardless of what Polar says. "Remove this licence"
+   * must always work — being offline is not a reason to stay activated on a
+   * browser you are trying to leave.
+   */
   async function deactivate() {
+    const stored = await readStored();
     await writeStored(null);
-    return { ok: true, message: 'Licence removed from this browser.' };
+
+    if (!stored || !stored.activationId || !organizationId()) {
+      return { ok: true, message: 'Licence removed from this browser.' };
+    }
+
+    try {
+      await callPolar('deactivate', {
+        key: stored.key,
+        organization_id: organizationId(),
+        activation_id: stored.activationId,
+      });
+      return { ok: true, message: 'Licence removed, and this browser released at Polar.' };
+    } catch (_) {
+      return {
+        ok: true,
+        message:
+          'Licence removed from this browser. Polar could not be reached, so the ' +
+          'activation slot is still held — you can free it from your Polar customer portal.',
+      };
+    }
   }
 
   /**

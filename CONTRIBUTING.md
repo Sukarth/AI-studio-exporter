@@ -52,15 +52,17 @@ npm test          # everything
 npm run test:core # skips the tests that need a build
 ```
 
-`test/run.js` and `test/batch.js` run on plain Node with no dependencies, so
-they work on a fresh clone. `test/documents.js` needs the bundle described
+`test/run.js`, `test/license.js` and `test/batch.js` run on plain Node with no
+dependencies, so they work on a fresh clone. `test/documents.js` needs the bundle described
 below and skips itself when it is absent.
 
 `test/run.js` holds the unit tests and a handful of static checks on the repo
 itself — no literal control characters in source, every id the extension pages
 reach for exists in their markup, every fetched origin has a host permission.
 `test/batch.js` drives whole-library export end to end with only the API and
-the download faked.
+the download faked. `test/license.js` fakes storage and the network to cover
+the cases that decide whether a paying user keeps access — Polar unreachable, a
+revoked key, an activation slot being released.
 
 ### Building
 
