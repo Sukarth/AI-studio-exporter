@@ -22,7 +22,7 @@
   const AISE = (root.AISE = root.AISE || {});
 
   const CONFIG = { ELEMENT_LOAD_DELAY: 700 };
-  const ALLOWED_ACTIONS = new Set(['export', 'getStatus', 'cancel']);
+  const ALLOWED_ACTIONS = new Set(['export', 'exportLibrary', 'getStatus', 'cancel']);
 
   let isExporting = false;
   let shouldCancel = false;
@@ -374,23 +374,37 @@
     });
   }
 
-  async function runExport(request) {
+  /**
+   * Shared wrapper for both export kinds: one at a time, overlay up, overlay
+   * always torn down. `silent` suppresses the overlay for scheduled backups,
+   * which run in a background tab the user is not looking at.
+   */
+  async function runExport(request, work) {
     if (isExporting) return { success: false, message: 'An export is already running' };
 
     isExporting = true;
     shouldCancel = false;
-    showLoadingOverlay();
+    if (!request.silent) showLoadingOverlay();
 
     try {
       const settings = await getSettings();
       CONFIG.ELEMENT_LOAD_DELAY = settings.loadDelay;
 
-      return await AISE.exporter.exportConversation({
+      const requested = request.formatId || request.format || settings.defaultFormat || 'markdown';
+      const { format, downgraded, reason } = await AISE.license.resolveFormat(requested);
+      if (downgraded && !request.silent) updateLoadingStatus(reason);
+
+      const result = await work({
         settings,
-        formatId: request.format || settings.defaultFormat || 'markdown',
-        report: (message, progress) => updateLoadingStatus(message, progress),
+        formatId: format.id,
+        report: request.silent ? () => {} : (message, progress) => updateLoadingStatus(message, progress),
         shouldCancel: () => shouldCancel,
       });
+
+      if (downgraded && result && result.success) {
+        result.message = `${result.message} · ${reason}`;
+      }
+      return result;
     } catch (error) {
       console.error('[AI Studio Exporter] Export failed:', error);
       return { success: false, message: error && error.message ? error.message : String(error) };
@@ -400,6 +414,14 @@
       hideLoadingOverlay();
     }
   }
+
+  const runSingleExport = (request) =>
+    runExport(request, (options) => AISE.exporter.exportConversation(options));
+
+  const runLibraryExport = (request) =>
+    runExport(request, (options) =>
+      AISE.batch.exportLibrary(Object.assign({ filters: request.filters || {} }, options))
+    );
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const senderUrl = sender && sender.url;
@@ -421,8 +443,12 @@
     }
 
     if (request.action === 'export') {
-      runExport(request).then(sendResponse);
+      runSingleExport(request).then(sendResponse);
       return true; // responds asynchronously
+    }
+    if (request.action === 'exportLibrary') {
+      runLibraryExport(request).then(sendResponse);
+      return true;
     }
     if (request.action === 'getStatus') {
       sendResponse({ isExporting });

@@ -41,10 +41,23 @@ load(
   'pro/formats/jsonl.js',
   'pro/formats/csv.js',
   'pro/formats/html.js',
-  'pro/formats/obsidian.js'
+  'pro/formats/obsidian.js',
+  'pro/batch.js'
 );
 
 const { AISE } = globalThis;
+
+/**
+ * settings.js is a plain script whose top-level `const` declarations become
+ * global *lexical* bindings under eval — reachable by name from inside the same
+ * script, but never as properties of globalThis. Appending an export statement
+ * to the source is the only way to get at them from here.
+ */
+const SETTINGS = (0, eval)(
+  fs.readFileSync(path.join(ROOT, 'settings.js'), 'utf8') +
+    '\n;({ AI_STUDIO_FORMATS, AI_STUDIO_DEFAULT_SETTINGS, AI_STUDIO_FREE_FORMATS,' +
+    ' sanitizeSettings, isAIStudioUrl, isAIStudioPromptUrl, isAIStudioLibraryUrl });'
+);
 
 const ALL_ON = {
   scrapeImages: true,
@@ -530,6 +543,124 @@ test('every pro format is flagged pro and every free format is not', () => {
   for (const id of ['jsonl', 'csv', 'html', 'obsidian']) {
     assert.strictEqual(AISE.formats[id].pro, true, `${id} must be gated`);
   }
+});
+
+// --- batch --------------------------------------------------------------
+
+const { selectConversations, makeFolderNamer, buildIndexMarkdown } = AISE.batch;
+
+const DAY = 24 * 60 * 60 * 1000;
+const libraryIndex = () => [
+  { id: 'aaa111', title: 'Alpha', modifiedAt: Date.now() - 1 * DAY },
+  { id: 'bbb222', title: 'Beta notes', modifiedAt: Date.now() - 10 * DAY },
+  { id: 'ccc333', title: 'Alpha', modifiedAt: Date.now() - 40 * DAY },
+  { id: 'ddd444', title: 'Gamma', modifiedAt: null },
+];
+
+test('filters the library by date range', () => {
+  const picked = selectConversations(libraryIndex(), { since: Date.now() - 20 * DAY });
+  assert.deepStrictEqual(picked.map((c) => c.id), ['aaa111', 'bbb222']);
+});
+
+test('filters by title substring, case-insensitively', () => {
+  const picked = selectConversations(libraryIndex(), { titleQuery: 'alpha' });
+  assert.deepStrictEqual(picked.map((c) => c.id).sort(), ['aaa111', 'ccc333']);
+});
+
+test('sorts newest first and honours a limit', () => {
+  const picked = selectConversations(libraryIndex(), { limit: 2 });
+  assert.deepStrictEqual(picked.map((c) => c.id), ['aaa111', 'bbb222']);
+});
+
+test('incremental filter skips conversations unchanged since last export', () => {
+  const index = libraryIndex();
+  // Pretend Alpha was exported after its last modification, Beta before.
+  const seen = { aaa111: index[0].modifiedAt + 1000, bbb222: index[1].modifiedAt - 1000 };
+  const picked = selectConversations(index, { skipUnchangedSince: seen });
+  assert.ok(!picked.some((c) => c.id === 'aaa111'), 'unchanged conversation skipped');
+  assert.ok(picked.some((c) => c.id === 'bbb222'), 'modified conversation included');
+  assert.ok(picked.some((c) => c.id === 'ccc333'), 'never-exported conversation included');
+});
+
+test('folder naming disambiguates identical titles', () => {
+  const name = makeFolderNamer();
+  const first = name({ title: 'Alpha', id: 'aaa111aaa' });
+  const second = name({ title: 'Alpha', id: 'ccc333ccc' });
+  assert.strictEqual(first, 'Alpha');
+  assert.notStrictEqual(second, first, 'second Alpha must not collide');
+  assert.ok(second.includes('ccc333'), 'disambiguated with the id');
+});
+
+test('folder naming sanitises titles into safe paths', () => {
+  const name = makeFolderNamer();
+  const folder = name({ title: '../../etc/passwd', id: 'xxx' });
+  assert.ok(!folder.includes('/'), 'no path separators');
+  assert.ok(!folder.includes('\\'));
+});
+
+test('index lists every conversation and reports failures separately', () => {
+  const entries = [
+    { title: 'Alpha', path: 'Alpha/conversation.md', modifiedAt: Date.now(), turnCount: 4 },
+  ];
+  const failures = [{ id: 'zzz', title: 'Broken', error: 'Requested entity was not found.' }];
+  const md = buildIndexMarkdown(entries, failures, Date.now());
+
+  assert.ok(md.includes('[Alpha](Alpha/conversation.md)'));
+  assert.ok(md.includes('**Conversations:** 1'));
+  assert.ok(md.includes('## Not exported'), 'failures get their own section');
+  assert.ok(md.includes('Broken'), 'a failed conversation is still named');
+});
+
+test('index escapes paths containing spaces', () => {
+  const entries = [{ title: 'My Chat', path: 'My Chat/conversation.md', modifiedAt: null, turnCount: 1 }];
+  const md = buildIndexMarkdown(entries, [], Date.now());
+  assert.ok(md.includes('My%20Chat/conversation.md'), 'link target is URI-encoded');
+});
+
+// --- settings and format catalogue --------------------------------------
+
+test('the UI format catalogue matches the registered formatters', () => {
+  // settings.js mirrors format metadata so extension pages need not load every
+  // renderer. If they drift, the popup offers formats that do not exist.
+  const catalogue = SETTINGS.AI_STUDIO_FORMATS;
+  const registered = Object.keys(AISE.formats);
+
+  for (const entry of catalogue) {
+    assert.ok(registered.includes(entry.id) || entry.id === 'pdf' || entry.id === 'docx',
+      `catalogue lists ${entry.id} but no formatter registers it`);
+  }
+  for (const id of registered) {
+    assert.ok(catalogue.some((entry) => entry.id === id), `${id} is registered but missing from the catalogue`);
+  }
+  for (const entry of catalogue) {
+    const format = AISE.formats[entry.id];
+    if (format) {
+      assert.strictEqual(entry.pro, format.pro, `${entry.id} pro flag disagrees between catalogue and formatter`);
+    }
+  }
+});
+
+test('sanitizeSettings rejects a format id that is not a plausible slug', () => {
+  const sanitized = SETTINGS.sanitizeSettings({ defaultFormat: '../../etc/passwd' });
+  assert.strictEqual(sanitized.defaultFormat, 'markdown');
+});
+
+test('sanitizeSettings clamps the load delay to a sane range', () => {
+  assert.strictEqual(SETTINGS.sanitizeSettings({ loadDelay: 50 }).loadDelay, 700);
+  assert.strictEqual(SETTINGS.sanitizeSettings({ loadDelay: 999999 }).loadDelay, 700);
+  assert.strictEqual(SETTINGS.sanitizeSettings({ loadDelay: 1200 }).loadDelay, 1200);
+});
+
+test('url helpers separate prompt pages from the rest of AI Studio', () => {
+  const { isAIStudioUrl, isAIStudioPromptUrl, isAIStudioLibraryUrl } = SETTINGS;
+  assert.ok(isAIStudioPromptUrl('https://aistudio.google.com/prompts/ABC'));
+  assert.ok(isAIStudioPromptUrl('https://aistudio.google.com/u/2/prompts/ABC'));
+  assert.ok(!isAIStudioPromptUrl('https://aistudio.google.com/library'));
+  assert.ok(isAIStudioLibraryUrl('https://aistudio.google.com/u/1/library'));
+  assert.ok(isAIStudioUrl('https://aistudio.google.com/anything'));
+  // Must not be fooled by a lookalike host.
+  assert.ok(!isAIStudioUrl('https://aistudio.google.com.evil.test/prompts/ABC'));
+  assert.ok(!isAIStudioUrl('http://aistudio.google.com/prompts/ABC'), 'http is rejected');
 });
 
 // --- report -------------------------------------------------------------
