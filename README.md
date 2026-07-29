@@ -1,112 +1,165 @@
 # 📦 AI Studio Exporter
 
-A browser extension that exports conversations from Google AI Studio, including all media attachments and chat history in a convenient ZIP file.
+**The 100% open source Google AI Studio exporter.** Every line of it — including the paid features — is in this repository under the MIT licence.
+
+Export any AI Studio conversation, or your entire library, complete with attachments, reasoning, model settings and timestamps.
 
 ![Demo of AI Studio Exporter](https://raw.githubusercontent.com/Sukarth/AI-studio-exporter/main/images/Demo.gif)
 
-## ✨ Features
+## ✨ What it does
 
-- 🔄 **Complete Export**: Exports entire conversation history from Google AI Studio.
-- 🖼️ **Media Preservation**: Includes all image attachments in the export.
-- 📝 **Markdown Format**: Conversations are saved in readable Markdown format.
-- 🤖 **Reasoning Support**: Captures model reasoning blocks when available.
-- 📦 **ZIP Archive**: Everything packaged in a single ZIP file.
-- 🎨 **User-Friendly**: Simple, intuitive popup interface.
-- ⚡ **Fast & Efficient**: Optimized for performance and works entirely client-side.
-- 🔒 **Privacy-Focused**: NO data is collected or sent to any external servers.
+- **Exports the whole conversation**, not just what is on screen — no scrolling, no lazy-loading gaps.
+- **Real attachments.** Files are fetched from Drive at full fidelity rather than saved as page thumbnails. Google Docs, Sheets and Slides are converted on the way out.
+- **Reasoning kept separate** from the answer, so you can read either without the other.
+- **Everything the API knows**: model, temperature, top-P, top-K, output limit, system instruction, per-message timestamps and token counts. Each one has its own on/off switch.
+- **Nothing leaves your machine.** No analytics, no servers, no accounts. The only network request the extension ever makes on its own behalf is a one-time licence check, if you buy Pro.
 
-### 🔐 Security & Privacy
-- Extension pages now ship with an explicit CSP (`script-src 'self'; object-src 'none'`) for defense in depth.
-- Popup and background logic only interact with `https://aistudio.google.com/prompts/` tabs.
-- Messages between scripts are validated and rejected when untrusted or malformed.
-- User settings are sanitized before use to avoid unexpected values.
+### Fast
 
-## 🚀 Installation (from Source)
+Version 2 talks to AI Studio's own API instead of scraping the page. A 200-message conversation used to take about two and a half minutes of automated scrolling; it now takes under a second. If the API is ever unavailable, the old page-scraping path is still there as a fallback.
 
-Follow these steps to install and run the extension locally. Installation from Chrome Web Store is coming soon...
+## 💾 Formats
 
-### Step 1: Get the Code
+| Format | | |
+|---|---|---|
+| Markdown | `.md` | Free |
+| JSON | `.json` | Free |
+| Plain text | `.txt` | Free |
+| HTML | `.html` | Pro — one self-contained page, images inlined |
+| PDF | `.pdf` | Pro |
+| Word | `.docx` | Pro |
+| Obsidian | `.md` | Pro — frontmatter, wikilinked attachments, collapsed reasoning callouts |
+| CSV | `.csv` | Pro — one row per message |
+| JSONL | `.jsonl` | Pro — ready for fine-tuning |
 
-Clone the repository to your local machine:
+## 💎 Pro
+
+A one-time payment. No subscription, no account, and the code stays open.
+
+- **Whole-library export** — every conversation in one archive, with an index, filters and automatic splitting for large libraries.
+- **Six extra formats** (above).
+- **Scheduled backups** — daily, weekly or monthly, and incremental, so a routine run only fetches what changed.
+
+Buy a key at [the purchase page](https://github.com/Sukarth/AI-studio-exporter#pro), paste it into the extension's settings, and it works offline from then on.
+
+### Why is a paid tier in an open source project?
+
+Because the alternative is that this gets abandoned. Pro pays for the time to keep the extension working when Google changes their API — which they do.
+
+To be completely straightforward about how the licence check works, since you can read the code anyway:
+
+- **Keys cannot be forged.** Activation is validated against Polar, which is the source of truth. Nobody can mint a working key offline.
+- **The check can be bypassed.** This is client-side JavaScript in an open source extension. Anyone can edit it out. No obfuscation is attempted, because none would survive contact with a determined person and it would only make the code harder to audit.
+
+If you are going to remove the check, you may as well [open an issue](https://github.com/Sukarth/AI-studio-exporter/issues) about what you actually needed instead.
+
+## 🚀 Installation
+
+Chrome Web Store listing is on the way. Until then:
+
+### From source
+
 ```bash
 git clone https://github.com/sukarth/ai-studio-exporter.git
 cd ai-studio-exporter
 ```
 
-### Step 2: Load the Extension in Chrome
+Then:
 
-1.  **Open Chrome Extensions Page**: Navigate to `chrome://extensions/`.
-2.  **Enable Developer Mode**: Toggle the "Developer mode" switch in the top-right corner.
-3.  **Load the Extension**:
-    *   Click the "Load unpacked" button.
-    *   Select the `ai-studio-exporter` folder that you cloned.
-4.  **Verify**: The "AI Studio Exporter" should now appear in your list of extensions. Pin it to your toolbar for easy access.
+1. Open `chrome://extensions/`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and pick the `ai-studio-exporter` folder.
+4. Pin it to your toolbar.
 
-## 🔄 Updating
+The built PDF/DOCX bundle is committed, so a plain clone works as-is and everything else runs with no dependencies at all. Only rebuild it if you have changed `pro/formats/documents.src.js`:
 
-When a new version is released:
+```bash
+npm install
+npm run build
+```
 
-1. Download the latest version (git clone)
-2. Go to `chrome://extensions/`
-3. Find "AI Studio Exporter"
-4. Click "Remove"
-5. Add the extension again by clicking "Load unpacked" and selecting the new/same `ai-studio-exporter` folder
-
-Alternatively, if using Git:
+### Updating
 
 ```bash
 git pull origin main
-# Reload the extension in chrome://extensions/
+# then hit the reload icon on the extension's card in chrome://extensions/
 ```
 
 ## 📖 Usage
 
-1.  **Navigate to Google AI Studio**: Go to a conversation you want to export (e.g., `https://aistudio.google.com/prompts/...`).
-2.  **Click the Extension Icon**: The popup will show a "Connected to AI Studio" status.
-3.  **Export**: Click the "Export Conversation" button. The ZIP file containing your conversation and images will be downloaded automatically after the export completes.
+1. Open a conversation on [AI Studio](https://aistudio.google.com/).
+2. Click the extension icon.
+3. Pick a format and click **Export Conversation**.
 
-## 📂 Export Structure
+For the whole library, click **Export Entire Library** instead. Settings — what to include, default format, backup schedule — live behind the gear icon.
 
-Your downloaded ZIP file will have the following structure:
+## 📂 What you get
+
+A single conversation with attachments:
 
 ```
-ai-studio-export-YYYY-MM-DDTHH-mm-ss.zip
-├── conversation.md          # Full conversation in Markdown
-├── image1.jpg               # User-uploaded image 1 (if any)
-├── image2.png               # User-uploaded image 2 (if any)
-└── ...                      # Additional media files (if any, such as attached document previews)
+Conversation Title - 2026-07-29T14-30-00.zip
+├── conversation.md
+└── attachments/
+    ├── diagram.png
+    └── notes.pdf
 ```
 
-## 🤝 Contributing
+With nothing to bundle you get the bare file — `Conversation Title - 2026-07-29T14-30-00.md` — rather than a ZIP wrapped around a single document.
 
-Contributions are welcome! We appreciate any help, from reporting bugs to submitting pull requests. Please read our [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines on how to get started.
+The whole library:
 
+```
+ai-studio-library-2026-07-29T14-30-00.zip
+├── index.md                  # every conversation, dated and linked
+├── manifest.json             # machine-readable, including anything that failed
+├── Conversation Title/
+│   ├── conversation.md
+│   └── attachments/
+└── Another Conversation/
+    └── conversation.md
+```
 
-## 🛠️ Technical Details
+CSV and JSONL exports skip the folder structure and produce one dataset file for the whole library.
 
-- **Manifest V3**: Built using the latest Chrome extension architecture.
-- **JSZip**: Used for client-side ZIP file generation.
-- **Content Scripts**: For DOM manipulation and data extraction from the AI Studio page.
-- **Service Worker**: For background task coordination.
-- **Vanilla JS**: No heavy frameworks, keeping the extension lightweight.
+## 🔒 Privacy
+
+- Conversations are read, formatted and downloaded entirely inside your browser.
+- Attachments are fetched directly from Google with your existing session. They do not pass through anything of ours.
+- Settings sync with your Chrome profile; they contain no conversation content.
+- The one exception, stated plainly: activating a Pro licence sends the key to Polar once. Nothing else is sent, and it is never sent again.
+
+## 🛠️ How it works
+
+- **API first.** `src/api/` speaks AI Studio's own RPC interface. Because those endpoints are CORS-locked to the AI Studio origin, the transport (`src/api/rpc.js`) runs in the page's MAIN world and is reached over `postMessage`; everything else stays in the isolated world.
+- **One model, many writers.** Both the API path and the DOM fallback produce the same normalised conversation object (`src/model.js`), so a formatter never needs to know where the data came from.
+- **`src/api/decode.js` is the only file that knows the wire format.** AI Studio sends protobuf-JSON positional arrays; the index maps live in that one file, so a renumbered field is a one-file fix.
+- **Manifest V3**, vanilla JS, no framework. JSZip for archives; `docx` and `pdf-lib`, bundled with esbuild, for the two document formats.
 
 ### Permissions
 
-- `activeTab`: To access the current AI Studio tab.
-- `scripting`: To inject content scripts for data extraction.
-- `downloads`: To trigger the ZIP file download.
-- `storage`: To save user settings.
-- `host_permissions`: To run on the `aistudio.google.com` domain.
+| | |
+|---|---|
+| `activeTab`, `scripting` | Read the AI Studio tab you are on |
+| `downloads` | Save the export |
+| `storage` | Remember your settings and licence |
+| `alarms` | Scheduled backups |
+| `host_permissions` | `aistudio.google.com` only |
 
-## 🐛 Troubleshooting & known issues
+## 🐛 Troubleshooting
 
--   **Exported markdown file is missing formatting, spacing and/or text for messages**: Ensure the page is fully loaded before starting the export! If the issue persists, check the browser's developer console (F12) for errors and open a GitHub issue.
--   **Export button is disabled or "Not on AI Studio" message**: Make sure you are on a valid AI Studio conversation page and that the page has fully loaded. Try refreshing the page.
--   **Export fails or hangs**: Wait for the AI Studio page to load completely before starting the export. If the issue persists, check the browser's developer console (F12) for errors and open a GitHub issue.
+- **"Reload the AI Studio page, then try again"** — the content script has not been injected, usually right after installing or updating the extension. Refresh the tab.
+- **Export is slow, or the reasoning looks wrong** — the extension fell back to page scraping. Check the browser console (F12) for the reason and please open an issue; the API path should be handling it.
+- **Nothing happens when you click Export** — check that the page is a conversation (`aistudio.google.com/prompts/…`) rather than the library index.
+- **A few conversations failed in a library export** — the run continues past failures on purpose. `manifest.json` in the archive names each one and why.
+
+## 🤝 Contributing
+
+Contributions are welcome, from bug reports to pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) — it covers the layout, how to run the tests (`npm test`, no dependencies needed) and how to rebuild the document bundle.
 
 ## 📝 License
 
-This project is open source and available under the [MIT License](LICENSE).
+MIT. See [LICENSE](LICENSE), and [THIRD-PARTY.md](THIRD-PARTY.md) for the bundled libraries.
 
 ---
 
