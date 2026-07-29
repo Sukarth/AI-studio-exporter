@@ -24,13 +24,20 @@ function load(...relativePaths) {
   }
 }
 
+// The export pipeline reaches for browser globals at call time, not load time,
+// so stubbing the handful it touches is enough to exercise its pure helpers.
+globalThis.location = { href: 'https://aistudio.google.com/u/1/prompts/ABC123xyz789' };
+globalThis.document = { createElement: () => ({ click() {}, remove() {} }), body: { appendChild() {} } };
+globalThis.URL = globalThis.URL || { createObjectURL: () => 'blob:stub', revokeObjectURL() {} };
+
 load(
   'src/model.js',
   'src/api/decode.js',
   'src/api/attachments.js',
   'src/formats/markdown.js',
   'src/formats/json.js',
-  'src/formats/text.js'
+  'src/formats/text.js',
+  'src/export.js'
 );
 
 const { AISE } = globalThis;
@@ -274,6 +281,94 @@ test('strips path separators that would escape the archive directory', () => {
 
 test('falls back to a generic name and extension for unknown types', () => {
   assert.strictEqual(chooseFilename('', 'application/x-unknown-thing', null), 'attachment.bin');
+});
+
+// --- export pipeline ----------------------------------------------------
+
+const { currentPromptId, safeFilename, buildBaseName, planAssets } = AISE.exporter;
+
+test('extracts the prompt id from both plain and account-scoped URLs', () => {
+  assert.strictEqual(currentPromptId('https://aistudio.google.com/prompts/ABC123xyz789'), 'ABC123xyz789');
+  assert.strictEqual(currentPromptId('https://aistudio.google.com/u/3/prompts/ABC123xyz789'), 'ABC123xyz789');
+  assert.strictEqual(currentPromptId('https://aistudio.google.com/library'), null);
+});
+
+test('strips characters that are illegal in filenames', () => {
+  const name = safeFilename('Report: drafts/v2 "final" <x>?');
+  for (const ch of ['/', '\\', ':', '"', '<', '>', '?', '*', '|', '%']) {
+    assert.ok(!name.includes(ch), `"${ch}" must not survive`);
+  }
+});
+
+test('never produces a leading-dot or empty filename', () => {
+  assert.ok(!safeFilename('...').startsWith('.'));
+  assert.strictEqual(safeFilename(''), 'conversation');
+  assert.strictEqual(safeFilename('///'), 'conversation');
+});
+
+test('strips control characters from filenames', () => {
+  const withControls = 'a' + String.fromCharCode(0) + 'b' + String.fromCharCode(31) + 'c';
+  assert.strictEqual(safeFilename(withControls), 'a-b-c');
+});
+
+test('escapes Windows reserved device names', () => {
+  // "CON.md" cannot be created on Windows whatever the extension.
+  assert.strictEqual(safeFilename('CON'), 'CON-export');
+  assert.strictEqual(safeFilename('lpt1'), 'lpt1-export');
+  assert.strictEqual(safeFilename('console'), 'console');
+});
+
+test('source files contain no literal control characters', () => {
+  // A regex written with a raw NUL byte once made it into src/export.js, where
+  // it was invisible in review and silently changed which characters the
+  // filename sanitiser matched. Escapes only, from here on.
+  const walk = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : walk(full);
+      return /\.(js|json|html)$/.test(entry.name) ? [full] : [];
+    });
+
+  const files = [...walk(path.join(ROOT, 'src')), ...walk(path.join(ROOT, 'test'))]
+    .concat(['content.js', 'settings.js', 'popup.js', 'options.js', 'background.js', 'manifest.json']
+      .map((f) => path.join(ROOT, f))
+      .filter((f) => fs.existsSync(f)));
+
+  const dirty = files.filter((file) => {
+    const buf = fs.readFileSync(file);
+    for (let i = 0; i < buf.length; i++) {
+      const b = buf[i];
+      if (b < 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) return true;
+    }
+    return false;
+  });
+
+  assert.deepStrictEqual(dirty.map((f) => path.relative(ROOT, f)), [], 'files with control characters');
+});
+
+test('archive name leads with the conversation title', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  assert.ok(buildBaseName(c).startsWith('Arithmetic Chat'), 'title first, not a bare timestamp');
+});
+
+test('asset planning de-duplicates colliding attachment names', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  // Two attachments that would both land on the same archive path.
+  const parts = c.turns.flatMap((t) => t.parts);
+  parts.forEach((p) => { p.name = 'notes.txt'; p.mimeType = 'text/plain'; p.buffer = new ArrayBuffer(4); });
+
+  const { files, assetPaths } = planAssets(c);
+  const paths = files.map((f) => f.path);
+  assert.strictEqual(new Set(paths).size, paths.length, 'every archive path is unique');
+  assert.strictEqual(assetPaths.size, files.length);
+  assert.ok(paths.every((p) => p.startsWith('attachments/')));
+});
+
+test('asset planning skips parts that have no bytes', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  // Only the inline attachment carries data; the drive-referenced one does not.
+  const { files } = planAssets(c);
+  assert.strictEqual(files.length, 1, 'unfetched drive refs are not archive entries');
 });
 
 // --- report -------------------------------------------------------------

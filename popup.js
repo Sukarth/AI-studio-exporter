@@ -33,7 +33,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         return false;
       }
 
-      const isAIStudio = isAIStudioUrl(tab.url);
+      // isAIStudioUrl now matches the whole host, so gate the export button on
+      // actually being on a conversation rather than anywhere in AI Studio.
+      const isAIStudio = isAIStudioPromptUrl(tab.url);
 
       if (isAIStudio) {
         // Check if export is already running
@@ -114,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // Validate current tab before attempting export
-      if (!isAIStudioUrl(tab.url)) {
+      if (!isAIStudioPromptUrl(tab.url)) {
         showMessage('error', '✗ Please open a prompt on aistudio.google.com before exporting');
         exportBtn.disabled = true;
         return;

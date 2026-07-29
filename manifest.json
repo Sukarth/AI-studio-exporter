@@ -56,6 +56,10 @@
         "src/api/decode.js",
         "src/api/bridge.js",
         "src/api/attachments.js",
+        "src/formats/markdown.js",
+        "src/formats/json.js",
+        "src/formats/text.js",
+        "src/export.js",
         "content.js"
       ],
       "run_at": "document_idle"
