@@ -59,6 +59,8 @@ const SETTINGS = (0, eval)(
     ' sanitizeSettings, isAIStudioUrl, isAIStudioPromptUrl, isAIStudioLibraryUrl });'
 );
 
+const BOM = String.fromCharCode(0xfeff);
+
 const ALL_ON = {
   scrapeImages: true,
   scrapeAttachments: true,
@@ -483,6 +485,36 @@ test('csv quotes embedded quotes and newlines', () => {
   c.turns[0].text = 'say "hi"\nthen stop';
   const csv = AISE.formats.csv.render(c, ALL_ON);
   assert.ok(csv.includes('""hi""'), 'quotes are doubled per RFC 4180');
+});
+
+test('every concatenable format declares the preamble batch export must strip', () => {
+  // Whole-library export glues these together into a single dataset file. Any
+  // per-conversation preamble has to be declared so it appears once; a CSV
+  // whose header row repeats every few hundred lines is not a dataset.
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  for (const format of Object.values(AISE.formats)) {
+    if (!format.concatenable) continue;
+    const rendered = format.render(c, ALL_ON, new Map());
+    if (!format.preamble) {
+      assert.ok(
+        !rendered.startsWith(BOM),
+        `${format.id} emits a BOM but declares no preamble`
+      );
+      continue;
+    }
+    assert.ok(rendered.startsWith(format.preamble), `${format.id} does not start with its own preamble`);
+  }
+});
+
+test('csv carries its BOM and header in the declared preamble', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const csv = AISE.formats.csv.render(c, ALL_ON);
+  const { preamble } = AISE.formats.csv;
+
+  assert.ok(preamble.startsWith(BOM), 'BOM lives in the preamble');
+  assert.ok(preamble.includes('"conversation_id"'), 'so does the header row');
+  // What batch export does to the second and later conversations.
+  assert.ok(!csv.slice(preamble.length).includes('"conversation_id"'), 'header appears once');
 });
 
 test('html escapes message content rather than rendering it', () => {

@@ -418,10 +418,19 @@
   const runSingleExport = (request) =>
     runExport(request, (options) => AISE.exporter.exportConversation(options));
 
-  const runLibraryExport = (request) =>
-    runExport(request, (options) =>
+  /**
+   * Whole-library export is a Pro feature in its own right, not just a Pro
+   * format, so it is checked here rather than trusting the popup to have
+   * disabled the button.
+   */
+  async function runLibraryExport(request) {
+    if (!(await AISE.license.isPro({ skipRevalidation: true }))) {
+      return { success: false, message: 'Library export requires a Pro licence.' };
+    }
+    return runExport(request, (options) =>
       AISE.batch.exportLibrary(Object.assign({ filters: request.filters || {} }, options))
     );
+  }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const senderUrl = sender && sender.url;

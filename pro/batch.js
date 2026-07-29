@@ -142,6 +142,7 @@
     const entries = [];
     const failures = [];
     const exportedAt = {};
+    let concatenatedCount = 0;
     let done = 0;
 
     const flushVolume = async () => {
@@ -166,12 +167,21 @@
         const rendered = await format.render(conversation, settings, assetPaths);
 
         if (concatenate) {
-          if (rendered) concatenatedChunks.push(rendered);
-          bufferedBytes += (rendered && rendered.length) || 0;
+          // Only the first chunk keeps the format's preamble — a CSV with a
+          // header row repeated every few hundred lines is not a dataset.
+          if (rendered) {
+            const chunk =
+              concatenatedChunks.length && format.preamble && rendered.startsWith(format.preamble)
+                ? rendered.slice(format.preamble.length)
+                : rendered;
+            concatenatedChunks.push(chunk);
+            bufferedBytes += chunk.length;
+            concatenatedCount++;
+          }
         } else {
           const folder = nameFolder(conversation);
-          const body = format.binary ? rendered : rendered;
-          zip.file(`${folder}/conversation.${format.extension}`, body);
+          // JSZip takes a Blob or a string equally happily.
+          zip.file(`${folder}/conversation.${format.extension}`, rendered);
           bufferedBytes += format.binary ? (rendered.size || 0) : rendered.length;
 
           for (const { path, part } of files) {
@@ -272,7 +282,10 @@
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
 
-    const parts = [`Exported ${concatenate ? selected.length - failures.length : entries.length} conversations`];
+    // A concatenable format can legitimately produce nothing for a conversation
+    // — JSONL skips anything without an assistant reply — so count what landed
+    // in the file rather than what was attempted.
+    const parts = [`Exported ${concatenate ? concatenatedCount : entries.length} conversations`];
     if (downloads.length > 1) parts.push(`${downloads.length} archives`);
     if (failures.length) parts.push(`${failures.length} failed`);
 

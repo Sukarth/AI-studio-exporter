@@ -27,8 +27,12 @@
     return `"${text.replace(/"/g, '""')}"`;
   }
 
+  // CRLF per RFC 4180, and a BOM so Excel reads UTF-8 rather than guessing the
+  // local codepage and mangling every non-ASCII character.
+  const HEADER = '\uFEFF' + COLUMNS.map(cell).join(',') + '\r\n';
+
   function render(conversation, settings) {
-    const rows = [COLUMNS.map(cell).join(',')];
+    const rows = [];
 
     conversation.turns.forEach((turn, index) => {
       rows.push([
@@ -44,9 +48,7 @@
       ].map(cell).join(','));
     });
 
-    // CRLF per RFC 4180, and a BOM so Excel reads UTF-8 rather than guessing
-    // the local codepage and mangling every non-ASCII character.
-    return '\uFEFF' + rows.join('\r\n') + '\r\n';
+    return HEADER + rows.join('\r\n') + '\r\n';
   }
 
   AISE.formats = AISE.formats || {};
@@ -58,6 +60,10 @@
     pro: true,
     bundlesAssets: false,
     concatenable: true,
+    // Whole-library export concatenates every conversation into one file.
+    // Declaring the preamble lets it appear once rather than once per
+    // conversation, which would leave a header row buried in the data.
+    preamble: HEADER,
     render,
     COLUMNS,
   };
