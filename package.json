@@ -4,7 +4,10 @@
   "description": "Chrome extension to export conversations from Google AI Studio with media attachments",
   "main": "background.js",
   "scripts": {
-    "test": "node test/run.js"
+    "test": "node test/run.js && node test/documents.js",
+    "build": "node build.js",
+    "build:watch": "node build.js --watch",
+    "test:core": "node test/run.js"
   },
   "keywords": [
     "chrome-extension",
@@ -20,6 +23,12 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/sukarth/ai-studio-exporter"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "pdf-lib": "^1.17.1"
   }
-
 }

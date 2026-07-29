@@ -93,15 +93,17 @@
   async function packageExport(conversation, format, settings) {
     const { assetPaths, files } = planAssets(conversation);
     const includeAssets = format.bundlesAssets && files.length > 0;
-    const body = format.render(conversation, settings, assetPaths);
     const baseName = buildBaseName(conversation);
 
+    // DOCX and PDF build their own container and return a Blob; the text
+    // formats return a string. Await regardless, since either may be async.
+    const rendered = await format.render(conversation, settings, assetPaths);
+    const body = format.binary
+      ? rendered
+      : new Blob([rendered], { type: `${format.mimeType};charset=utf-8` });
+
     if (!includeAssets) {
-      return {
-        blob: new Blob([body], { type: `${format.mimeType};charset=utf-8` }),
-        filename: `${baseName}.${format.extension}`,
-        assetCount: 0,
-      };
+      return { blob: body, filename: `${baseName}.${format.extension}`, assetCount: 0 };
     }
 
     const zip = new JSZip();
@@ -183,6 +185,12 @@
 
     AISE.model.applySettings(conversation, settings);
 
+    // Formats can flag content they cannot represent — the PDF fonts, for
+    // instance, cannot draw non-Latin scripts. Surface it rather than handing
+    // back a file full of question marks with no explanation.
+    const warning = typeof format.warn === 'function' ? format.warn(conversation) : null;
+    if (warning) report(warning);
+
     report('Packaging…');
     const { blob, filename, assetCount } = await packageExport(conversation, format, settings);
 
@@ -198,7 +206,7 @@
     if (failed) parts.push(`${failed} attachment${failed === 1 ? '' : 's'} unavailable`);
     if (conversation.source === 'dom') parts.push('reduced fidelity (page scraping)');
 
-    return { success: true, message: parts.join(' · '), filename };
+    return { success: true, message: parts.join(' · '), filename, warning };
   }
 
   AISE.exporter = {

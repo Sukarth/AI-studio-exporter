@@ -30,6 +30,62 @@ Pull requests are the best way to propose changes to the codebase. We actively w
 5.  Make sure your code lints.
 6.  Issue that pull request!
 
+## Development
+
+### Running the extension
+
+No install step is needed to run or hack on the extension:
+
+1. Clone the repo.
+2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**
+   and select the repository folder.
+3. After changing a file, hit reload on the extension card, then reload the
+   AI Studio tab so content scripts re-inject.
+
+To confirm the content script is live on a page, check for the
+`data-ai-studio-exporter` attribute on `<html>` — it holds the extension version.
+
+### Tests
+
+```bash
+npm test          # everything
+npm run test:core # skips the tests that need a build
+```
+
+`test/run.js` runs on plain Node with no dependencies, so it works on a fresh
+clone. `test/documents.js` needs the bundle described below and skips itself
+when it is absent.
+
+### Building
+
+Only DOCX and PDF need a build; everything else is plain source the browser
+loads directly.
+
+```bash
+npm install
+npm run build        # or: npm run build:watch
+```
+
+This bundles `pro/formats/documents.src.js` into
+`vendor/pro-documents.bundle.js` with esbuild. **That output is committed**, so
+you only need to run it if you change that one file — and you should commit the
+rebuilt bundle alongside your change.
+
+The build fails if the bundle contains `eval`, `new Function` or
+`importScripts`, since Manifest V3's CSP blocks them at runtime. Dependencies
+sometimes ship unreachable instances of these; if you hit one, confirm it really
+cannot execute and add it to `KNOWN_UNREACHABLE` in `build.js` with a note
+explaining why.
+
+See [THIRD-PARTY.md](THIRD-PARTY.md) for the dependency list and licensing.
+
+### A note on non-ASCII characters in source
+
+Write control characters and unusual codepoints as escapes (`\u0000`, `\u00A0`),
+never as literals. A raw NUL byte inside a regex character class once silently changed
+which characters a sanitiser matched, and was invisible in review. `npm test`
+fails the build if a literal control character appears in any source file.
+
 ## Styleguides
 
 ### Git Commit Messages

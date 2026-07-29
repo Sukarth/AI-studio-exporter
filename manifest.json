@@ -63,6 +63,7 @@
         "pro/formats/csv.js",
         "pro/formats/html.js",
         "pro/formats/obsidian.js",
+        "vendor/pro-documents.bundle.js",
         "src/export.js",
         "content.js"
       ],
