@@ -412,6 +412,40 @@ test('source files contain no literal control characters', () => {
   assert.deepStrictEqual(dirty.map((f) => path.relative(ROOT, f)), [], 'files with control characters');
 });
 
+test('every element the popup and options pages reach for exists in their HTML', () => {
+  // Extension pages cannot be driven by devtools automation, so a typo'd id
+  // shows up as a silent null.addEventListener at boot with nothing in the
+  // page console anyone is looking at. Cheaper to pin it here.
+  const pages = [['popup.js', 'popup.html'], ['options.js', 'options.html']];
+
+  for (const [script, markup] of pages) {
+    const js = fs.readFileSync(path.join(ROOT, script), 'utf8');
+    const html = fs.readFileSync(path.join(ROOT, markup), 'utf8');
+
+    const declared = new Set();
+    for (const match of html.matchAll(/\bid="([^"]+)"/g)) declared.add(match[1]);
+
+    const wanted = new Set();
+    for (const match of js.matchAll(/getElementById\('([^']+)'\)/g)) wanted.add(match[1]);
+    // options.js goes through a one-letter helper: el('backupFormat').
+    for (const match of js.matchAll(/\bel\('([^']+)'\)/g)) wanted.add(match[1]);
+
+    const missing = [...wanted].filter((id) => !declared.has(id));
+    assert.deepStrictEqual(missing, [], `${script} references ids absent from ${markup}`);
+  }
+});
+
+test('the options page renders a control for every boolean setting', () => {
+  // The checkbox bindings are derived from the defaults, so a setting added
+  // without markup is saved as false forever and never surfaces.
+  const html = fs.readFileSync(path.join(ROOT, 'options.html'), 'utf8');
+  const booleans = Object.keys(SETTINGS.AI_STUDIO_DEFAULT_SETTINGS).filter(
+    (key) => typeof SETTINGS.AI_STUDIO_DEFAULT_SETTINGS[key] === 'boolean'
+  );
+  const missing = booleans.filter((key) => !html.includes(`id="${key}"`));
+  assert.deepStrictEqual(missing, [], 'boolean settings with no checkbox');
+});
+
 test('archive name leads with the conversation title', () => {
   const c = AISE.decode.decodeConversation(wirePrompt());
   assert.ok(buildBaseName(c).startsWith('Arithmetic Chat'), 'title first, not a bare timestamp');
