@@ -29,7 +29,32 @@ const AI_STUDIO_DEFAULT_SETTINGS = Object.freeze({
   loadDelay: 700,
 });
 
-const AI_STUDIO_FREE_FORMATS = Object.freeze(['markdown', 'json', 'text']);
+/**
+ * Format catalogue for UI use.
+ *
+ * The formatters themselves live in content scripts and carry their own
+ * metadata; this is a lightweight mirror so the popup and options page can
+ * render a picker without loading every renderer (including the 0.76MB
+ * document bundle) into an extension page that will never call them.
+ *
+ * Keep the ids in sync with pro/formats/ and src/formats/ — the test suite
+ * asserts they match.
+ */
+const AI_STUDIO_FORMATS = Object.freeze([
+  { id: 'markdown', label: 'Markdown (.md)', pro: false },
+  { id: 'json', label: 'JSON (.json)', pro: false },
+  { id: 'text', label: 'Plain text (.txt)', pro: false },
+  { id: 'html', label: 'HTML - self-contained page', pro: true },
+  { id: 'pdf', label: 'PDF', pro: true },
+  { id: 'docx', label: 'Word document (.docx)', pro: true },
+  { id: 'obsidian', label: 'Obsidian Markdown', pro: true },
+  { id: 'csv', label: 'CSV - one row per message', pro: true },
+  { id: 'jsonl', label: 'JSONL - fine-tuning dataset', pro: true },
+]);
+
+const AI_STUDIO_FREE_FORMATS = Object.freeze(
+  AI_STUDIO_FORMATS.filter((f) => !f.pro).map((f) => f.id)
+);
 
 const BOOLEAN_SETTINGS = Object.freeze(
   Object.keys(AI_STUDIO_DEFAULT_SETTINGS).filter(
