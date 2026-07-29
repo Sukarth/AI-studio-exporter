@@ -434,5 +434,12 @@
     return false;
   });
 
+  // Injection marker. The isolated world is invisible from the page and from
+  // devtools automation, so without this there is no way to tell "extension not
+  // loaded" apart from "extension loaded but broken" — which is the first thing
+  // worth knowing in any bug report.
+  document.documentElement.dataset.aiStudioExporter =
+    (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || 'unknown';
+
   console.log('[AI Studio Exporter] content script ready');
 })(typeof globalThis !== 'undefined' ? globalThis : self);
