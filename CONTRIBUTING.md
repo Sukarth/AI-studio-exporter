@@ -48,8 +48,11 @@ To confirm the content script is live on a page, check for the
 ### Tests
 
 ```bash
-npm test          # everything
-npm run test:core # skips the tests that need a build
+npm test              # the dependency-free suite
+npm run test:core     # just the unit tests
+npm run test:ui       # popup, options and service worker in a real Chrome
+npm run test:ui:export # a full export, end to end, in a real Chrome
+npm run test:all      # all of the above
 ```
 
 Everything except `test/documents.js` runs on plain Node with no dependencies,
@@ -65,6 +68,37 @@ the cases that decide whether a paying user keeps access — Polar unreachable, 
 revoked key, an activation slot being released. `test/attachments.js` fakes
 Drive and counts requests, because most of what matters there is about requests
 that should *not* happen.
+
+### Browser tests
+
+`test/ui.js` and `test/ui-export.js` need Playwright, which is a devDependency:
+
+```bash
+npm install
+npx playwright install chromium
+```
+
+They launch a real Chrome with the extension really loaded, so they cover what
+a faked `chrome.*` never can: a broken manifest, an unregistered listener, a
+page that throws on load, an alarm that is not actually created.
+
+`test/ui-export.js` runs a whole export without a Google account. Playwright
+fulfils requests to `https://aistudio.google.com/**` itself, so the page carries
+that real origin — which is what decides whether Chrome injects the content
+scripts — while the body is ours. The MakerSuite RPC and Drive are answered with
+canned wire-format fixtures, and the downloaded archive is read back off disk
+and checked byte for byte.
+
+Two constraints worth knowing before you edit them:
+
+- **Headed only.** Loading an unpacked MV3 extension headlessly does not
+  reliably start the service worker on current Chrome. CI needs a display.
+- **One browser launch per process.** Repeated `launchPersistentContext` calls
+  in a single process intermittently fail to load the extension at all, which
+  is why the two browser suites are separate files rather than one.
+
+Polar is intercepted, never called — activations are seat-limited and a test run
+must not spend one.
 
 ### Building
 

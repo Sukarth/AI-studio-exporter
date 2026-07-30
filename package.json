@@ -8,7 +8,9 @@
     "build": "node build.js",
     "build:watch": "node build.js --watch",
     "test:core": "node test/run.js",
-    "test:ui": "node test/ui.js"
+    "test:ui": "node test/ui.js",
+    "test:ui:export": "node test/ui-export.js",
+    "test:all": "npm test && npm run test:ui && npm run test:ui:export"
   },
   "keywords": [
     "chrome-extension",
