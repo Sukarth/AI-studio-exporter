@@ -34,6 +34,9 @@
         isThought: turn.isThought,
         text: turn.text,
         tokenCount: settings.includeTokenCounts ? turn.tokenCount : undefined,
+        // Consumers reading this as a dataset need to know a message had files
+        // that this export does not contain, or they will treat it as complete.
+        excludedAttachments: turn.excludedAttachments || undefined,
         timestamp: settings.includeTimestamps && turn.timestamp ? new Date(turn.timestamp).toISOString() : undefined,
         parts: turn.parts.length
           ? turn.parts.map((part) => ({

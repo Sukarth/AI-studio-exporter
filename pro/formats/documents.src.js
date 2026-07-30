@@ -55,6 +55,8 @@ function turnSubtitle(turn, settings) {
   const bits = [];
   if (settings.includeTimestamps && turn.timestamp) bits.push(fmtDate(turn.timestamp));
   if (settings.includeTokenCounts && turn.tokenCount !== null) bits.push(`${turn.tokenCount} tokens`);
+  const excluded = turn.excludedAttachments || 0;
+  if (excluded) bits.push(`${excluded} attachment${excluded === 1 ? '' : 's'} not included in export`);
   return bits.join('  |  ');
 }
 

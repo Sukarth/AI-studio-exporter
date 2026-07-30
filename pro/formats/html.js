@@ -160,6 +160,10 @@
       const sub = [];
       if (settings.includeTimestamps && turn.timestamp) sub.push(fmtDate(turn.timestamp));
       if (settings.includeTokenCounts && turn.tokenCount !== null) sub.push(`${turn.tokenCount} tokens`);
+      // Otherwise a message whose only content was an excluded attachment
+      // renders as an empty card.
+      const excluded = turn.excludedAttachments || 0;
+      if (excluded) sub.push(`${excluded} attachment${excluded === 1 ? '' : 's'} not included in export`);
 
       const media = turn.parts.map((part) => renderPart(part, paths.get(part))).join('\n');
       const body = turn.text ? renderMarkdown(escapeHtml(turn.text)) : '';

@@ -100,6 +100,12 @@
       if (settings.includeTokenCounts && turn.tokenCount !== null) {
         meta.push(`${turn.tokenCount.toLocaleString('en-US')} tokens`);
       }
+      // Without this, a message whose only content was an attachment the user
+      // opted out of renders as a bare heading — indistinguishable from a bug.
+      const excluded = turn.excludedAttachments || 0;
+      if (excluded) {
+        meta.push(`${excluded} attachment${excluded === 1 ? '' : 's'} not included in export`);
+      }
       if (meta.length) out.push('', `_${meta.join(' · ')}_`);
 
       out.push('');

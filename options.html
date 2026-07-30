@@ -203,6 +203,12 @@
       <p class="hint">Files are fetched from Drive, so exports contain the real thing rather than a thumbnail.</p>
 
       <div class="row">
+        <input type="checkbox" id="condenseAttachments">
+        <label for="condenseAttachments">Keep attachments with their message
+          <small>AI Studio stores each attached file as its own message. On by default,
+            so a message with three images stays one message instead of four.</small></label>
+      </div>
+      <div class="row">
         <input type="checkbox" id="scrapeImages">
         <label for="scrapeImages">Images</label>
       </div>

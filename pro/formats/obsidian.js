@@ -85,6 +85,8 @@
       const meta = [];
       if (settings.includeTimestamps && turn.timestamp) meta.push(new Date(turn.timestamp).toISOString());
       if (settings.includeTokenCounts && turn.tokenCount !== null) meta.push(`${turn.tokenCount} tokens`);
+      const excluded = turn.excludedAttachments || 0;
+      if (excluded) meta.push(`${excluded} attachment${excluded === 1 ? '' : 's'} not included in export`);
       if (meta.length) out.push('', `*${meta.join(' · ')}*`);
 
       out.push('');

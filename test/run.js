@@ -259,6 +259,84 @@ test('applySettings strips opted-out content and refreshes stats', () => {
   assert.strictEqual(c.stats.totalTokens, null, 'token total recomputed after counts removed');
 });
 
+/** Three attachment-only turns followed by the message they were sent with. */
+function attachmentRun() {
+  const c = AISE.model.emptyConversation('ABC123', 'api');
+  const attach = (driveId, tokens, type) =>
+    AISE.model.makeTurn('user', '', {
+      tokenCount: tokens,
+      parts: [{ type, name: `${driveId}.bin`, driveId, byteLength: 10 }],
+    });
+
+  c.turns = [
+    attach('one', 100, 'image'),
+    attach('two', 200, 'file'),
+    attach('three', 300, 'image'),
+    AISE.model.makeTurn('user', 'What do you make of these?', { tokenCount: 7 }),
+    AISE.model.makeTurn('model', 'Three files.', { tokenCount: 3 }),
+  ];
+  return AISE.model.recomputeStats(c);
+}
+
+test('folds attachment-only turns into the message they were sent with', () => {
+  // AI Studio files every attachment as its own turn, so a real export showed
+  // three headed blocks containing nothing but a token count.
+  const c = attachmentRun();
+  AISE.model.applySettings(c, ALL_ON);
+
+  assert.strictEqual(c.turns.length, 2, 'four user turns became one');
+  assert.strictEqual(c.turns[0].text, 'What do you make of these?');
+  assert.strictEqual(c.turns[0].parts.length, 3, 'every attachment came along');
+  assert.strictEqual(c.turns[0].tokenCount, 100 + 200 + 300 + 7, 'and so did their tokens');
+});
+
+test('keeps attachment order when folding', () => {
+  const c = attachmentRun();
+  AISE.model.applySettings(c, ALL_ON);
+  assert.deepStrictEqual(c.turns[0].parts.map((p) => p.driveId), ['one', 'two', 'three']);
+});
+
+test('leaves AI Studio structure alone when condensing is off', () => {
+  const c = attachmentRun();
+  AISE.model.applySettings(c, Object.assign({}, ALL_ON, { condenseAttachments: false }));
+  assert.strictEqual(c.turns.length, 5);
+});
+
+test('counts excluded attachments instead of leaving an empty message', () => {
+  // Exporting images only used to produce a run of headings with no content,
+  // because the file turns were emptied but kept.
+  const c = attachmentRun();
+  AISE.model.applySettings(c, Object.assign({}, ALL_ON, { scrapeAttachments: false }));
+
+  assert.strictEqual(c.turns[0].parts.length, 2, 'the two images survive');
+  assert.strictEqual(c.turns[0].excludedAttachments, 1, 'the file is counted, not forgotten');
+});
+
+test('markdown says what was left out rather than showing a bare heading', () => {
+  const c = attachmentRun();
+  AISE.model.applySettings(c, Object.assign({}, ALL_ON, {
+    scrapeImages: false,
+    scrapeAttachments: false,
+  }));
+  const md = AISE.formats.markdown.render(c, ALL_ON, new Map());
+  assert.ok(md.includes('3 attachments not included in export'), md);
+});
+
+test('every formatter discloses excluded attachments', () => {
+  const c = attachmentRun();
+  AISE.model.applySettings(c, Object.assign({}, ALL_ON, {
+    scrapeImages: false,
+    scrapeAttachments: false,
+  }));
+
+  for (const id of ['markdown', 'text', 'html', 'obsidian']) {
+    const rendered = AISE.formats[id].render(c, ALL_ON, new Map());
+    assert.ok(/3 attachments not included/.test(rendered), `${id} omits the disclosure`);
+  }
+  const json = JSON.parse(AISE.formats.json.render(c, ALL_ON, new Map()));
+  assert.strictEqual(json.turns[0].excludedAttachments, 3);
+});
+
 // --- formatters ---------------------------------------------------------
 
 test('markdown includes metadata and unambiguous turn delimiters', () => {

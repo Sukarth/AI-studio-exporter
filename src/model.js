@@ -80,7 +80,15 @@
 
   function makeTurn(role, text, extra) {
     return Object.assign(
-      { role, isThought: false, text: text || '', parts: [], tokenCount: null, timestamp: null },
+      {
+        role,
+        isThought: false,
+        text: text || '',
+        parts: [],
+        excludedAttachments: 0,
+        tokenCount: null,
+        timestamp: null,
+      },
       extra || {}
     );
   }
@@ -112,9 +120,61 @@
     return conversation;
   }
 
+  /** Whether a part survives the user's attachment settings. */
+  function partIncluded(part, settings) {
+    if (part.type === 'image') return !!settings.scrapeImages;
+    if (part.type === 'file') return !!settings.scrapeAttachments;
+    return true;
+  }
+
+  /**
+   * AI Studio files each attachment as its own turn, so a message with three
+   * images arrives as four turns: three attachment-only and one carrying the
+   * text. Rendered literally that is three headed blocks with nothing under
+   * them, which is what a real export looked like.
+   *
+   * Fold each run of attachment-only turns into the same-role turn that follows
+   * it, summing token counts, so the export matches what the user actually sent.
+   */
+  function condenseAttachmentTurns(conversation) {
+    const turns = conversation.turns;
+    const out = [];
+
+    for (let i = 0; i < turns.length; i++) {
+      const turn = turns[i];
+      const attachmentOnly = !turn.text.trim() && (turn.parts.length > 0 || turn.excludedAttachments > 0);
+
+      // A trailing run with no message after it stays as it is: there is
+      // nothing to merge into, and dropping it would lose the attachment.
+      const next = turns[i + 1];
+      if (!attachmentOnly || !next || next.role !== turn.role || next.isThought !== turn.isThought) {
+        out.push(turn);
+        continue;
+      }
+
+      next.parts = turn.parts.concat(next.parts);
+      next.excludedAttachments = (turn.excludedAttachments || 0) + (next.excludedAttachments || 0);
+      if (typeof turn.tokenCount === 'number') {
+        next.tokenCount = (next.tokenCount || 0) + turn.tokenCount;
+      }
+      // The attachment was sent first, so its timestamp is the message's.
+      if (turn.timestamp && (!next.timestamp || turn.timestamp < next.timestamp)) {
+        next.timestamp = turn.timestamp;
+      }
+    }
+
+    conversation.turns = out;
+    return conversation;
+  }
+
   /**
    * Drop content the user opted out of, then refresh stats so downstream
    * formatters never report on turns that are no longer present.
+   *
+   * Excluded attachments are counted rather than forgotten. Removing them
+   * outright left messages that were nothing but a heading and a token count,
+   * which reads as a bug; `excludedAttachments` lets a formatter say what was
+   * left out instead.
    */
   function applySettings(conversation, settings) {
     if (!settings) return conversation;
@@ -134,15 +194,24 @@
     if (!settings.includeTokenCounts) {
       conversation.turns.forEach((t) => { t.tokenCount = null; });
     }
-    if (!settings.scrapeImages) {
-      conversation.turns.forEach((t) => { t.parts = t.parts.filter((p) => p.type !== 'image'); });
+
+    for (const turn of conversation.turns) {
+      const kept = turn.parts.filter((p) => partIncluded(p, settings));
+      turn.excludedAttachments = (turn.excludedAttachments || 0) + (turn.parts.length - kept.length);
+      turn.parts = kept;
     }
-    if (!settings.scrapeAttachments) {
-      conversation.turns.forEach((t) => { t.parts = t.parts.filter((p) => p.type !== 'file'); });
-    }
+
+    if (settings.condenseAttachments !== false) condenseAttachmentTurns(conversation);
 
     return recomputeStats(conversation);
   }
 
-  AISE.model = { emptyConversation, makeTurn, recomputeStats, applySettings, PROMPT_URL };
+  AISE.model = {
+    emptyConversation,
+    makeTurn,
+    recomputeStats,
+    applySettings,
+    condenseAttachmentTurns,
+    PROMPT_URL,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

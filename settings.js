@@ -15,8 +15,8 @@
  * open repository without weakening anything.
  */
 const AI_STUDIO_PRO = Object.freeze({
-  purchaseUrl: 'https://github.com/Sukarth/AI-studio-exporter#pro',
-  polarOrganizationId: '',
+  purchaseUrl: 'https://buy.polar.sh/polar_cl_zXcBSToqRBTzAPMZVxosZ3Fi116OohXGyXHtw3NVK7Q',
+  polarOrganizationId: '23a764fc-aa21-4b92-857f-274a354d6f3a',
 });
 
 const AI_STUDIO_DEFAULT_SETTINGS = Object.freeze({
@@ -27,6 +27,11 @@ const AI_STUDIO_DEFAULT_SETTINGS = Object.freeze({
   scrapeAttachmentTitle: true,
   scrapeAttachmentSize: true,
   scrapeReasoning: true,
+
+  // AI Studio files each attachment as its own message. Folding them into the
+  // message they were sent with is what the user actually did, so it is on by
+  // default; turning it off preserves AI Studio's own structure.
+  condenseAttachments: true,
 
   // Metadata the API exposes but the page does not render. Defaulting these on
   // makes exports richer than before; each is individually switchable because
