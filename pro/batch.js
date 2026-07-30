@@ -159,7 +159,12 @@
         const conversation = await AISE.api.fetchConversation(summary.id);
 
         if (wantsAttachments) {
-          await AISE.attachments.resolveAttachments(conversation, null, shouldCancel);
+          // No caching here: every conversation is visited once, so a cache
+          // would only compete with the archive for memory.
+          await AISE.attachments.resolveAttachments(conversation, null, shouldCancel, {
+            settings,
+            cache: false,
+          });
         }
         AISE.model.applySettings(conversation, settings);
 

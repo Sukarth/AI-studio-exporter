@@ -145,11 +145,15 @@
         if (settings.scrapeAttachments || settings.scrapeImages) {
           const pending = conversation.turns.flatMap((t) => t.parts).filter((p) => p.driveId).length;
           if (pending) {
-            report(`Downloading ${pending} attachment${pending === 1 ? '' : 's'}…`);
+            // The count is of Drive references, not downloads: the settings
+            // decide which of them are actually fetched, and that is only known
+            // once each one has been classified.
+            report(`Checking ${pending} attachment${pending === 1 ? '' : 's'}…`);
             await AISE.attachments.resolveAttachments(
               conversation,
               (done, total) => report(`Downloading attachments… (${done}/${total})`),
-              shouldCancel
+              shouldCancel,
+              { settings }
             );
           }
         }
