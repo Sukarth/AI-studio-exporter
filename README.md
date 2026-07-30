@@ -9,7 +9,7 @@ Export any AI Studio conversation, or your entire library, complete with attachm
 ## ✨ What it does
 
 - **Exports the whole conversation**, not just what is on screen — no scrolling, no lazy-loading gaps.
-- **Real attachments.** Files are fetched from Drive at full fidelity rather than saved as page thumbnails. Google Docs, Sheets and Slides are converted on the way out.
+- **Real attachments.** Files are fetched from Drive at full fidelity rather than saved as page thumbnails. Google Docs, Sheets and Slides are converted on the way out, and only the types you asked for are downloaded at all.
 - **Reasoning kept separate** from the answer, so you can read either without the other.
 - **Everything the API knows**: model, temperature, top-P, top-K, output limit, system instruction, per-message timestamps and token counts. Each one has its own on/off switch.
 - **Nothing leaves your machine.** No analytics, no servers, no accounts. The only network request the extension ever makes on its own behalf is a one-time licence check, if you buy Pro.
