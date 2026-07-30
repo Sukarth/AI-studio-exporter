@@ -198,6 +198,28 @@ async function main() {
     assert.strictEqual(downloads.length, 0, 'and no empty archive downloaded');
   });
 
+  await test('surfaces a format warning once for the whole run', async () => {
+    // A single export reports this as it happens. A library export has no
+    // per-conversation status to attach it to, so without this someone asking
+    // for PDF gets hundreds of files of question marks and no explanation.
+    const original = AISE.formats.markdown.warn;
+    AISE.formats.markdown.warn = () => 'Some text uses characters this format cannot draw.';
+    try {
+      const result = await runLibrary('markdown');
+      assert.deepStrictEqual(result.warnings, ['Some text uses characters this format cannot draw.']);
+      assert.match(result.message, /cannot draw/, result.message);
+    } finally {
+      if (original) AISE.formats.markdown.warn = original;
+      else delete AISE.formats.markdown.warn;
+    }
+  });
+
+  await test('says nothing when a format has no warning', async () => {
+    const result = await runLibrary('markdown');
+    assert.deepStrictEqual(result.warnings, []);
+    assert.ok(!/cannot draw/.test(result.message));
+  });
+
   await test('filters by title', async () => {
     const result = await runLibrary('markdown', { titleQuery: 'weekly' });
     assert.strictEqual(result.success, true);

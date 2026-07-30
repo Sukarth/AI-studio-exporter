@@ -144,6 +144,12 @@
     const concatenatedChunks = [];
     const entries = [];
     const failures = [];
+    // Formats can flag content they cannot represent — the PDF fonts cannot
+    // draw non-Latin scripts. A single export reports this as it happens; here
+    // there is no per-conversation status to attach it to, so it is collected
+    // and reported once at the end rather than silently producing a few hundred
+    // files full of question marks.
+    const warnings = new Set();
     const exportedAt = {};
     let concatenatedCount = 0;
     let done = 0;
@@ -172,6 +178,10 @@
         AISE.model.applySettings(conversation, settings);
 
         const { assetPaths, files } = AISE.exporter.planAssets(conversation);
+        if (typeof format.warn === 'function') {
+          const warning = format.warn(conversation);
+          if (warning) warnings.add(warning);
+        }
         const rendered = await format.render(conversation, settings, assetPaths);
 
         if (concatenate) {
@@ -297,11 +307,14 @@
     if (downloads.length > 1) parts.push(`${downloads.length} archives`);
     if (failures.length) parts.push(`${failures.length} failed`);
 
+    if (warnings.size) parts.push([...warnings][0]);
+
     return {
       success: true,
       message: parts.join(' · '),
       exportedAt,
       failures,
+      warnings: [...warnings],
       files: downloads.map((d) => d.filename),
     };
   }
