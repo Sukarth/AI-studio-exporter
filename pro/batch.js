@@ -91,7 +91,10 @@
       const modified = entry.modifiedAt
         ? new Date(entry.modifiedAt).toISOString().slice(0, 10)
         : 'unknown';
-      lines.push(`- [${entry.title}](${encodeURI(entry.path)}) — ${modified} · ${entry.turnCount} messages`);
+      // Folder names carry a " (id)" suffix when titles collide, and a bare
+      // encodeURI would leave those parentheses to end the link early.
+      const target = AISE.formats.markdown.escapeTarget(entry.path);
+      lines.push(`- [${entry.title}](${target}) — ${modified} · ${entry.turnCount} messages`);
     }
 
     if (failures.length) {

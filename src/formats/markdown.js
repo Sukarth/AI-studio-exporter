@@ -21,6 +21,24 @@
   /** Safe inside a Markdown link/image label. */
   const escapeLabel = (s) => String(s || '').replace(/([[\]])/g, '\\$1');
 
+  /**
+   * Safe inside a Markdown link target.
+   *
+   * encodeURI leaves parentheses alone, which is fine for a URL and wrong for
+   * Markdown: a parser ends the target at the first `)`. That matters because
+   * colliding attachment names are disambiguated with a " (2)" suffix, so any
+   * conversation with two files of the same name produced broken links — found
+   * on a real export where 12 of 42 links pointed at nothing.
+   *
+   * `#` would start a fragment and `?` a query, so those go too.
+   */
+  const escapeTarget = (s) =>
+    encodeURI(String(s || ''))
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29')
+      .replace(/#/g, '%23')
+      .replace(/\?/g, '%3F');
+
   function renderFrontMatter(conversation, settings) {
     const lines = [`# ${conversation.title}`, ''];
     const facts = [];
@@ -65,11 +83,11 @@
 
   function renderPart(part, assetPath) {
     if (part.type === 'image' && assetPath) {
-      return `![${escapeLabel(part.name || 'image')}](${encodeURI(assetPath)})`;
+      return `![${escapeLabel(part.name || 'image')}](${escapeTarget(assetPath)})`;
     }
     const name = part.name || (part.driveId ? `attachment-${part.driveId.slice(0, 8)}` : 'attachment');
     const size = part.byteLength ? ` _(${formatBytes(part.byteLength)})_` : '';
-    if (assetPath) return `📎 [${escapeLabel(name)}](${encodeURI(assetPath)})${size}`;
+    if (assetPath) return `📎 [${escapeLabel(name)}](${escapeTarget(assetPath)})${size}`;
     // No bytes retrieved — record that something was attached rather than
     // silently dropping it, so the export stays an honest record.
     return `📎 **${escapeLabel(name)}**${size} _(file not retrievable)_`;
@@ -125,5 +143,8 @@
     pro: false,
     bundlesAssets: true,
     render,
+    // Shared with the library index, which is Markdown and has the same
+    // collision suffixes in its paths.
+    escapeTarget,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

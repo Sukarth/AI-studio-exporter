@@ -658,6 +658,45 @@ test('csv carries its BOM and header in the declared preamble', () => {
   assert.ok(!csv.slice(preamble.length).includes('"conversation_id"'), 'header appears once');
 });
 
+test('markdown link targets survive a filename containing brackets', () => {
+  // Found on a real export: colliding attachment names get a " (2)" suffix
+  // from planAssets, encodeURI leaves parentheses alone, and every Markdown
+  // parser then ends the link at the first ")". 12 of 42 links pointed at
+  // nothing.
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const part = c.turns.flatMap((t) => t.parts)[0];
+  part.name = 'report (2).pdf';
+  part.type = 'file';
+
+  const paths = new Map([[part, 'attachments/report (2).pdf']]);
+  const md = AISE.formats.markdown.render(c, ALL_ON, paths);
+
+  const target = /\]\(([^)\s]*)\)/.exec(md.slice(md.indexOf('attachments') - 40));
+  assert.ok(target, 'no link found');
+  assert.ok(!/\(|\)/.test(target[1]), `unescaped parenthesis in ${target[1]}`);
+  assert.ok(target[1].includes('%282%29'), target[1]);
+});
+
+test('markdown link targets escape fragment and query characters', () => {
+  const { escapeTarget } = AISE.formats.markdown;
+  assert.strictEqual(escapeTarget('attachments/a#b.png'), 'attachments/a%23b.png');
+  assert.strictEqual(escapeTarget('attachments/a?b.png'), 'attachments/a%3Fb.png');
+  // Spaces still go through encodeURI, and the separator must stay a separator.
+  assert.strictEqual(escapeTarget('attachments/a b.png'), 'attachments/a%20b.png');
+});
+
+test('the library index escapes its folder names too', () => {
+  // makeFolderNamer appends "(abc123)" when two conversations share a title.
+  const index = AISE.batch.buildIndexMarkdown(
+    [{ title: 'Notes', path: 'Notes (a1b2c3)/conversation.md', modifiedAt: 0, turnCount: 2 }],
+    [],
+    0
+  );
+  const target = /\]\(([^)\s]*)\)/.exec(index);
+  assert.ok(target, 'no link in the index');
+  assert.ok(!/\(|\)/.test(target[1]), `unescaped parenthesis in ${target[1]}`);
+});
+
 test('html escapes message content rather than rendering it', () => {
   const c = AISE.decode.decodeConversation(wirePrompt());
   c.turns[0].text = '<script>alert(1)</script>';
