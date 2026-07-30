@@ -204,6 +204,11 @@
    * to Markdown with an explanation when not, so an export never simply fails.
    */
   async function resolveFormat(formatId) {
+    // Only the content script loads the formatters; this file is also loaded by
+    // the popup and options page, where calling this is a mistake worth naming.
+    if (!AISE.formats) {
+      throw new Error('resolveFormat is only available where the formatters are loaded');
+    }
     const format = AISE.formats[formatId];
     if (!format) return { format: AISE.formats.markdown, downgraded: true, reason: 'Unknown format.' };
     if (!format.pro) return { format, downgraded: false, reason: null };
