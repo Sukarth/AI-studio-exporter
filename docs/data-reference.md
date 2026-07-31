@@ -170,12 +170,29 @@ any failures.
   "format": "markdown",
   "volume": 1,
   "volumeCount": 2,
+  "library": [
+    {
+      "title": "How does the RPC auth work?",
+      "path": "how-does-the-rpc-auth-work/conversation.md",
+      "modifiedAt": 1750000000000,
+      "turnCount": 5,
+      "volume": 1
+    },
+    {
+      "title": "Design Review",
+      "path": "design-review/conversation.md",
+      "modifiedAt": 1749000000000,
+      "turnCount": 210,
+      "volume": 2
+    }
+  ],
   "conversations": [
     {
       "title": "How does the RPC auth work?",
       "path": "how-does-the-rpc-auth-work/conversation.md",
       "modifiedAt": 1750000000000,
-      "turnCount": 5
+      "turnCount": 5,
+      "volume": 1
     }
   ],
   "failures": []
@@ -186,8 +203,11 @@ any failures.
 | --- | --- |
 | `format` | The format id, matching the ids in [format guide](formats.md). |
 | `volume` / `volumeCount` | Archives are split near 256 MB. See [what you download](archives.md#large-libraries). |
-| `conversations[].modifiedAt` | Epoch **milliseconds** here, not ISO — this file is written by the batch layer, not the JSON formatter. |
-| `failures` | `[{id, title, error}]`. Only present in volume 1; the other volumes carry an empty array. |
+| `library` | **Every** conversation in the export, wherever it ended up. Present even when there is only one archive, so a consumer never has to special-case that. |
+| `conversations` | Only what this archive holds. `path` resolves inside it; a path from `library` may not. |
+| `*.volume` | Which part holds that conversation — always `1` when the export was not split. |
+| `*.modifiedAt` | Epoch **milliseconds** here, not ISO — this file is written by the batch layer, not the JSON formatter. |
+| `failures` | `[{id, title, error}]`. Repeated in every part: a failure list that exists in one archive out of three is one most people never see. |
 
 ---
 

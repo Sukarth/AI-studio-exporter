@@ -85,9 +85,9 @@ The CSV's header row appears once at the top, not once per conversation.
 
 ### Large libraries
 
-A per-conversation export splits into multiple archives once buffered content
-passes **256 MB** (measured before compression, since that is what predicts
-memory pressure, so the finished files are smaller):
+A per-conversation export splits into multiple archives once the next
+conversation would push one past **256 MB** — measured before compression,
+since that is what predicts memory pressure, so the finished files are smaller.
 
 ```
 ai-studio-library-2026-07-31T06-40-38 (part 1 of 3).zip
@@ -95,9 +95,26 @@ ai-studio-library-2026-07-31T06-40-38 (part 2 of 3).zip
 ai-studio-library-2026-07-31T06-40-38 (part 3 of 3).zip
 ```
 
-Each volume is self-contained and carries its own `index.md` and
-`manifest.json` covering just its own conversations. The failure list appears
-only in part 1.
+A part only exceeds 256 MB when a single conversation does on its own, and that
+conversation gets a part to itself rather than dragging its neighbours over the
+limit with it.
+
+**Every part lists the whole library.** Its `index.md` names every conversation
+in the export: the ones in that archive are links, and the rest say which part
+holds them.
+
+```markdown
+- [Weekly Notes](weekly-notes/conversation.md) — 2026-07-14 · 42 messages
+- Design Review — 2026-07-11 · 210 messages · **in part 3**
+```
+
+So whichever part you open, nothing in the export is unaccounted for and no
+link points at a file that is not there. The failure list appears in every
+part, for the same reason. `manifest.json` mirrors this: `conversations` is
+what this archive holds, `library` is everything, with a `volume` number on
+each entry.
+
+Extract the parts side by side and they merge into one folder.
 
 Chrome may ask once whether to allow multiple downloads.
 

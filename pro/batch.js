@@ -82,7 +82,22 @@
     };
   }
 
-  function buildIndexMarkdown(entries, failures, startedAt) {
+  /**
+   * The index every archive carries.
+   *
+   * It lists the whole export, not just the part it is sitting in. A
+   * conversation held by another part is named and pointed at that part
+   * instead of linked, so nothing in here is a link that resolves to nothing
+   * and nothing in the export is unaccounted for.
+   *
+   * @param {Array} entries every conversation exported, each stamped with its volume
+   * @param {{volume: number, volumeCount: number}} [place] omitted for a single archive
+   */
+  function buildIndexMarkdown(entries, failures, startedAt, place) {
+    const volume = place ? place.volume : 1;
+    const volumeCount = place ? place.volumeCount : 1;
+    const split = volumeCount > 1;
+
     const lines = [
       '# AI Studio Library Export',
       '',
@@ -90,16 +105,31 @@
       `**Conversations:** ${entries.length}  `,
     ];
     if (failures.length) lines.push(`**Failed:** ${failures.length}  `);
+    if (split) {
+      lines.push(
+        `**This archive:** part ${volume} of ${volumeCount}  `,
+        '',
+        `> The export was split across ${volumeCount} archives because of its size. Every part` +
+          ' lists the whole library; conversations held by another part are marked below.' +
+          ' Extract the parts side by side to browse them as one folder.'
+      );
+    }
     lines.push('', '---', '');
 
     for (const entry of entries) {
       const modified = entry.modifiedAt
         ? new Date(entry.modifiedAt).toISOString().slice(0, 10)
         : 'unknown';
+      const facts = `${modified} · ${entry.turnCount} messages`;
+
+      if (split && entry.volume !== volume) {
+        lines.push(`- ${entry.title} — ${facts} · **in part ${entry.volume}**`);
+        continue;
+      }
       // Folder names carry a " (id)" suffix when titles collide, and a bare
       // encodeURI would leave those parentheses to end the link early.
       const target = AISE.formats.markdown.escapeTarget(entry.path);
-      lines.push(`- [${entry.title}](${target}) — ${modified} · ${entry.turnCount} messages`);
+      lines.push(`- [${entry.title}](${target}) — ${facts}`);
     }
 
     if (failures.length) {
@@ -168,8 +198,14 @@
     let concatenatedCount = 0;
     let done = 0;
 
-    const flushVolume = async () => {
+    // Synchronous on purpose: callers rely on being able to close a volume
+    // between a size check and the writes that follow it, without yielding to
+    // another conversation mid-way.
+    const flushVolume = () => {
       if (!volumeEntries.length) return;
+      // Stamp before sealing, so every index can say which part holds what.
+      const number = volumes.length + 1;
+      for (const entry of volumeEntries) entry.volume = number;
       volumes.push({ zip, entries: volumeEntries });
       zip = new JSZip();
       bufferedBytes = 0;
@@ -211,19 +247,31 @@
             concatenatedCount++;
           }
         } else {
+          const documentBytes = format.binary ? rendered.size || 0 : rendered.length;
+          const assetBytes = files.reduce((total, { part }) => total + (part.byteLength || 0), 0);
+
+          // Everything from here to the end of this block runs without an
+          // await, so a concurrent worker cannot flush between the size check
+          // and the writes it guards.
+
+          // Close the current volume *before* adding, not after. Checking
+          // afterwards meant a volume could exceed the limit by however large
+          // the conversation was — and conversations of hundreds of megabytes
+          // are exactly the case volumes exist for. A volume can still exceed
+          // the limit, but only when one conversation does on its own, which
+          // is the one case that cannot be split any further.
+          if (volumeEntries.length && bufferedBytes + documentBytes + assetBytes > volumeLimit()) {
+            flushVolume();
+          }
+
           const folder = nameFolder(conversation);
           // JSZip takes a Blob or a string equally happily.
           zip.file(`${folder}/conversation.${format.extension}`, rendered);
-          bufferedBytes += format.binary ? (rendered.size || 0) : rendered.length;
+          bufferedBytes += documentBytes + assetBytes;
 
           for (const { path, part } of files) {
-            if (part.buffer) {
-              zip.file(`${folder}/${path}`, part.buffer);
-              bufferedBytes += part.byteLength || 0;
-            } else if (part.dataBase64) {
-              zip.file(`${folder}/${path}`, part.dataBase64, { base64: true });
-              bufferedBytes += part.byteLength || 0;
-            }
+            if (part.buffer) zip.file(`${folder}/${path}`, part.buffer);
+            else if (part.dataBase64) zip.file(`${folder}/${path}`, part.dataBase64, { base64: true });
           }
 
           const entry = {
@@ -249,7 +297,6 @@
           `Exporting conversations… ${failures.length ? `(${failures.length} failed)` : ''}`.trim(),
           `${done} / ${selected.length}`
         );
-        if (!concatenate && bufferedBytes >= volumeLimit()) await flushVolume();
       }
     };
 
@@ -279,9 +326,16 @@
       const blob = new Blob(concatenatedChunks, { type: `${format.mimeType};charset=utf-8` });
       downloads.push({ blob, filename: `ai-studio-library-${stamp}.${format.extension}` });
     } else {
-      await flushVolume();
+      flushVolume();
       volumes.forEach((volume, i) => {
-        volume.zip.file('index.md', buildIndexMarkdown(volume.entries, i === 0 ? failures : [], startedAt));
+        // Every volume carries the whole library, not just its own share.
+        // Splitting the index along with the files left each archive unable to
+        // say where anything else went; whichever part you open now lists the
+        // complete export and names the part holding each conversation.
+        volume.zip.file(
+          'index.md',
+          buildIndexMarkdown(entries, failures, startedAt, { volume: i + 1, volumeCount: volumes.length })
+        );
         volume.zip.file(
           'manifest.json',
           JSON.stringify(
@@ -291,8 +345,15 @@
               format: format.id,
               volume: i + 1,
               volumeCount: volumes.length,
+              // The whole export, with the part number on each entry. Present
+              // even in a single-volume export, so a consumer never has to
+              // special-case one archive against many.
+              library: entries,
               conversations: volume.entries,
-              failures: i === 0 ? failures : [],
+              // Repeated in every part rather than only the first. A failure
+              // list that exists in one archive out of three is a failure list
+              // most people never see.
+              failures,
             },
             null,
             2

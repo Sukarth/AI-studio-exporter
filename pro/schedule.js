@@ -64,32 +64,101 @@
     return state;
   }
 
-  /** An existing AI Studio tab if there is one, otherwise a new background tab. */
-  async function acquireTab() {
-    const existing = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
-    const usable = existing.find((tab) => tab.status === 'complete');
-    if (usable) return { tabId: usable.id, opened: false };
+  const BACKUP_URL = 'https://aistudio.google.com/prompts/new_chat';
 
-    const tab = await chrome.tabs.create({
-      url: 'https://aistudio.google.com/prompts/new_chat',
-      active: false,
-    });
-    return { tabId: tab.id, opened: true };
+  /**
+   * An AI Studio tab to run the export in.
+   *
+   * A scheduled backup almost never finds one already open, so opening one is
+   * the normal path rather than the fallback. It must not interrupt whatever
+   * the user is doing: the tab is created inactive, in a window that is never
+   * focused, and closed again when the backup finishes.
+   *
+   * @returns {Promise<{tabId: number, opened: boolean, windowId: ?number}>}
+   *   `opened` says whether this backup created the tab and therefore owns
+   *   closing it; `windowId` is set only when a window had to be opened too.
+   */
+  async function acquireTab() {
+    // A discarded tab (Chrome's memory saver unloads background tabs) still
+    // reports status 'complete' but has no content script behind it, so
+    // messaging it would stall until the timeout and then fail.
+    const existing = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
+    const usable = existing.find((tab) => tab.status === 'complete' && !tab.discarded);
+    if (usable) return { tabId: usable.id, opened: false, windowId: null };
+
+    // `active: false` opens the tab in the background of an existing window:
+    // it appears in the tab strip but does not steal focus or change what the
+    // user is looking at.
+    try {
+      const tab = await chrome.tabs.create({ url: BACKUP_URL, active: false });
+      return { tabId: tab.id, opened: true, windowId: null };
+    } catch (error) {
+      // Thrown when there is no window to put a tab in — Chrome still running
+      // with every window closed, which on macOS is an ordinary state and on
+      // any platform is what a backup scheduled overnight tends to find.
+      const window = await chrome.windows.create({
+        url: BACKUP_URL,
+        focused: false,
+        state: 'minimized',
+      });
+      const tab = window.tabs && window.tabs[0];
+      if (!tab) throw error;
+      return { tabId: tab.id, opened: true, windowId: window.id };
+    }
   }
 
-  /** Poll until the content script answers, so we never message a blank tab. */
+  /**
+   * Poll until the content script answers, so we never message a blank tab.
+   *
+   * Also watches for the tab leaving AI Studio. A profile that is signed out
+   * of Google — or whose session has expired, which is what an unattended
+   * backup eventually meets — is redirected to a sign-in page, where nothing
+   * of ours runs. Waiting the full timeout and then reporting that AI Studio
+   * "did not finish loading" is both slow and wrong.
+   *
+   * The extension deliberately holds no `tabs` permission, so it cannot read
+   * the tab's URL to find this out. A host-filtered query answers the only
+   * question that matters without one: is this tab still somewhere we are
+   * allowed to reach?
+   *
+   * @returns {Promise<{ready: boolean, reason: ?string}>}
+   */
   async function waitForContentScript(tabId) {
     const deadline = Date.now() + TAB_READY_TIMEOUT_MS;
+
     while (Date.now() < deadline) {
       try {
         const response = await chrome.tabs.sendMessage(tabId, { action: 'getStatus' });
-        if (response) return true;
+        if (response) return { ready: true, reason: null };
       } catch (_) {
         // Not injected yet.
       }
+
+      let tab = null;
+      try {
+        tab = await chrome.tabs.get(tabId);
+      } catch (_) {
+        return { ready: false, reason: 'The AI Studio tab was closed before the backup could start.' };
+      }
+
+      // Only once it has settled: a tab still loading may not match the host
+      // filter yet, and that is not a redirect.
+      if (tab.status === 'complete') {
+        const onSite = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
+        if (!onSite.some((candidate) => candidate.id === tabId)) {
+          return {
+            ready: false,
+            reason:
+              'AI Studio redirected somewhere else, which normally means this browser is ' +
+              'signed out of Google. Open AI Studio and sign in, and the next backup will run.',
+          };
+        }
+      }
+
       await new Promise((resolve) => setTimeout(resolve, TAB_POLL_MS));
     }
-    return false;
+
+    return { ready: false, reason: 'AI Studio did not finish loading in time.' };
   }
 
   async function runBackup() {
@@ -97,16 +166,17 @@
     if (!state.enabled) return { success: false, message: 'Scheduled backup is disabled' };
 
     let tabId = null;
-    let openedByUs = false;
+    let openedTabId = null;
+    let openedWindowId = null;
 
     try {
       const acquired = await acquireTab();
       tabId = acquired.tabId;
-      openedByUs = acquired.opened;
+      openedTabId = acquired.opened ? acquired.tabId : null;
+      openedWindowId = acquired.windowId;
 
-      if (!(await waitForContentScript(tabId))) {
-        throw new Error('AI Studio did not finish loading in time');
-      }
+      const ready = await waitForContentScript(tabId);
+      if (!ready.ready) throw new Error(ready.reason);
 
       const result = await chrome.tabs.sendMessage(tabId, {
         action: 'exportLibrary',
@@ -130,9 +200,13 @@
       await writeState(Object.assign({}, state, { lastRunAt: Date.now(), lastResult: `Failed: ${message}` }));
       return { success: false, message };
     } finally {
-      // Leave tabs the user already had open exactly as they were.
-      if (openedByUs && tabId !== null) {
-        try { await chrome.tabs.remove(tabId); } catch (_) { /* already gone */ }
+      // Leave anything the user already had open exactly as it was, and clear
+      // up whatever this run opened — including the window, when there was no
+      // window to borrow.
+      if (openedWindowId !== null) {
+        try { await chrome.windows.remove(openedWindowId); } catch (_) { /* already gone */ }
+      } else if (openedTabId !== null) {
+        try { await chrome.tabs.remove(openedTabId); } catch (_) { /* already gone */ }
       }
     }
   }

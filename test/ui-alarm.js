@@ -14,6 +14,13 @@
  * contract — that enabling a daily backup arms a 1440-minute alarm — is
  * asserted separately, against the alarm `configure()` actually creates.
  *
+ * One boundary worth knowing: Playwright can only fulfil requests for pages it
+ * opened itself, so a tab the *extension* opens reaches the real Google and is
+ * bounced to a sign-in page. That splits the run in two. The tab-acquisition
+ * tests use that path deliberately — it is also, exactly, the signed-out case
+ * — and assert what the backup does to the user's browser. The export tests
+ * then work against a page Playwright opened, so the export itself is real.
+ *
  *     npm run test:ui:alarm
  *
  * Headed only, one launch per process — see the note in test/ui.js.
@@ -92,6 +99,22 @@ function wirePrompt(id, title) {
 let passed = 0;
 const failures = [];
 
+// Module scope so expectDownload() can reach it.
+let context;
+
+/**
+ * A download the test is about to trigger.
+ *
+ * The rejection is swallowed here so that a test failing before it awaits
+ * the download does not take the whole process down with an unhandled
+ * rejection, hiding the failure that actually mattered.
+ */
+function expectDownload() {
+  const promise = context.waitForEvent('download', { timeout: 120000 });
+  promise.catch(() => {});
+  return promise;
+}
+
 async function test(name, fn) {
   try {
     await fn();
@@ -146,7 +169,7 @@ async function main() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aise-alarm-'));
   const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aise-alarm-dl-'));
 
-  const context = await chromium.launchPersistentContext(userDataDir, {
+  context = await chromium.launchPersistentContext(userDataDir, {
     headless: false,
     acceptDownloads: true,
     args: [`--disable-extensions-except=${ROOT}`, `--load-extension=${ROOT}`],
@@ -164,10 +187,37 @@ async function main() {
 
     console.log(`\nrunning against ${new URL(worker.url()).host}\n`);
 
-    // A tab for the backup to find. Opening its own would work too, but this
-    // keeps the run deterministic and exercises the path users actually hit.
+    /**
+     * Wait for the content script to finish.
+     *
+     * A download event fires when the file starts arriving, which is before
+     * the export function returns — so starting the next backup right after it
+     * is rejected with "an export is already running". Real users cannot hit
+     * this; two tests in a row can.
+     */
+    async function waitForIdle() {
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const status = await worker.evaluate(async () => {
+          const [tab] = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
+          if (!tab) return { isExporting: false };
+          try {
+            return await chrome.tabs.sendMessage(tab.id, { action: 'getStatus' });
+          } catch (_) {
+            return { isExporting: false };
+          }
+        });
+        if (status && !status.isExporting) return;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      throw new Error('the content script never went idle');
+    }
+
+    // Deliberately *not* an AI Studio tab. A backup scheduled for the middle
+    // of the night finds whatever the user left open, which is almost never
+    // AI Studio, so opening its own tab is the normal path and the one worth
+    // testing. This page stands in for the user's actual work.
     const page = await context.newPage();
-    await page.goto('https://aistudio.google.com/prompts/new_chat');
+    await page.goto('data:text/html,<title>Something else</title>Not AI Studio');
 
     // Library export is Pro. Written straight to storage in the shape
     // license.js writes, so this test does not also depend on Polar.
@@ -227,7 +277,125 @@ async function main() {
       assert.ok(!alarm, 'a disabled backup left an alarm armed');
     });
 
+    // --- acquiring a tab to work in -------------------------------------
+    //
+    // A scheduled backup almost never finds AI Studio already open, so it has
+    // to open its own tab without disturbing whatever the user is doing. These
+    // run before any AI Studio page exists, so the open-a-tab path is the one
+    // under test.
+
+    let opened;
+    let activeBefore;
+    let signedOut;
+
+    // The test above left backups disabled, and a disabled backup returns
+    // before it ever looks for a tab.
+    await worker.evaluate(() =>
+      globalThis.AISE.schedule.configure({ enabled: true, frequency: 'daily', formatId: 'markdown' })
+    );
+
+    await test('with no AI Studio tab open, it opens one in the background', async () => {
+      assert.strictEqual(
+        (await worker.evaluate(() => chrome.tabs.query({ url: 'https://aistudio.google.com/*' }))).length,
+        0,
+        'an AI Studio tab was already open, so this proves nothing'
+      );
+
+      // Registered here rather than at the top so the listener is certainly
+      // still live: a runtime listener dies with the service worker, and only
+      // a top-level one survives eviction.
+      await worker.evaluate(() => {
+        globalThis.__opened = [];
+        globalThis.__removed = [];
+        chrome.tabs.onCreated.addListener((tab) =>
+          globalThis.__opened.push({ id: tab.id, active: tab.active, windowId: tab.windowId })
+        );
+        chrome.tabs.onRemoved.addListener((id) => globalThis.__removed.push(id));
+      });
+      activeBefore = await worker.evaluate(async () => {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        return tab ? { id: tab.id, windowId: tab.windowId } : null;
+      });
+
+      const startedAt = Date.now();
+      signedOut = await worker.evaluate(() => globalThis.AISE.schedule.runBackup());
+      signedOut.elapsed = Date.now() - startedAt;
+
+      opened = await worker.evaluate(() => globalThis.__opened || []);
+      assert.strictEqual(opened.length, 1, `expected one tab to be opened, saw ${opened.length}`);
+      assert.strictEqual(opened[0].active, false, 'the backup tab stole focus');
+    });
+
+    await test('it leaves the user looking at the same tab', async () => {
+      const activeAfter = await worker.evaluate(async () => {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        return tab ? { id: tab.id, windowId: tab.windowId } : null;
+      });
+      assert.deepStrictEqual(activeAfter, activeBefore, 'the active tab changed during the backup');
+    });
+
+    await test('it closes the tab it opened', async () => {
+      const removed = await worker.evaluate(() => globalThis.__removed || []);
+      assert.ok(removed.includes(opened[0].id), 'the backup tab was left behind');
+
+      const left = await worker.evaluate(() => chrome.tabs.query({ url: 'https://aistudio.google.com/*' }));
+      assert.strictEqual(left.length, 0, `${left.length} AI Studio tabs left open`);
+    });
+
+    await test('a signed-out browser is told to sign in, and told quickly', async () => {
+      // This profile has no Google session, so AI Studio redirects the tab to
+      // a sign-in page — exactly what an unattended backup meets once a
+      // session expires. The extension holds no `tabs` permission and cannot
+      // read the URL, so it used to wait out the full 45-second load timeout
+      // and then blame the page for loading slowly.
+      assert.strictEqual(signedOut.success, false, JSON.stringify(signedOut));
+      assert.match(signedOut.message, /sign(ed)? ?in/i, signedOut.message);
+      assert.ok(
+        signedOut.elapsed < 20000,
+        `took ${(signedOut.elapsed / 1000).toFixed(1)}s, which means it waited out the load timeout`
+      );
+    });
+
+    await test('with no window to put a tab in, it opens one and cleans it up', async () => {
+      // Chrome running with every window closed is ordinary on macOS, and is
+      // what a backup scheduled for the middle of the night often finds.
+      // tabs.create throws there, and the fallback has to produce a window
+      // that does not appear in front of whatever else is on screen.
+      await worker.evaluate(() => {
+        globalThis.__realCreate = chrome.tabs.create;
+        chrome.tabs.create = () => Promise.reject(new Error('No current window'));
+        globalThis.__windows = [];
+        chrome.windows.onCreated.addListener((w) => globalThis.__windows.push({ id: w.id, state: w.state }));
+      });
+
+      try {
+        await worker.evaluate(() => globalThis.AISE.schedule.runBackup());
+
+        const windows = await worker.evaluate(() => globalThis.__windows || []);
+        assert.strictEqual(windows.length, 1, `expected one window to be opened, saw ${windows.length}`);
+
+        const survived = await worker.evaluate(
+          (id) => chrome.windows.getAll().then((all) => all.some((w) => w.id === id)),
+          windows[0].id
+        );
+        assert.strictEqual(survived, false, 'the window it opened was left behind');
+      } finally {
+        await worker.evaluate(() => {
+          chrome.tabs.create = globalThis.__realCreate;
+        });
+      }
+    });
+
     // --- a real alarm firing --------------------------------------------
+    //
+    // From here an AI Studio page is open, so the backup reuses it. That is
+    // not just convenience: Playwright can only fulfil requests for pages it
+    // opened itself, so a tab the extension opens reaches the real Google and
+    // is bounced to a sign-in page. Reusing a page means the export half of
+    // the run is exercised for real; the open-a-tab half is covered above.
+
+    const studio = await context.newPage();
+    await studio.goto('https://aistudio.google.com/prompts/new_chat');
 
     let download;
     let state;
@@ -254,7 +422,7 @@ async function main() {
 
       // Chrome's scheduler owns everything from here. Nothing in this test
       // calls runBackup(); if the alarm does not fire, no download appears.
-      const fired = context.waitForEvent('download', { timeout: 120000 });
+      const fired = expectDownload();
       const armedAt = Date.now();
       await worker.evaluate((name) => chrome.alarms.create(name, { delayInMinutes: 1 / 60 }), ALARM_NAME);
 
@@ -265,6 +433,7 @@ async function main() {
       download = { path: target, name: download.suggestedFilename() };
 
       assert.ok(fs.statSync(download.path).size > 0, 'the archive is empty');
+      await waitForIdle();
     });
 
     await test('the archive is a library export of everything in the library', async () => {
@@ -284,9 +453,26 @@ async function main() {
       assert.deepStrictEqual(manifest.failures, []);
     });
 
+    await test('a tab the user already had open is reused, and left open', async () => {
+      const before = await worker.evaluate(() => (globalThis.__opened || []).length);
+      const fired = expectDownload();
+      const result = await worker.evaluate(async () => {
+        await globalThis.AISE.schedule.configure({ exportedAt: {} });
+        return globalThis.AISE.schedule.runBackup();
+      });
+      assert.strictEqual(result.success, true, result.message);
+      await (await fired).saveAs(path.join(downloadDir, 'reuse.zip'));
+      await waitForIdle();
+
+      const after = await worker.evaluate(() => (globalThis.__opened || []).length);
+      assert.strictEqual(after, before, 'a tab was opened even though one was available');
+      assert.ok(!studio.isClosed(), "the user's own tab was closed");
+    });
+
     await test('the API was used, not the page scraper', async () => {
       assert.ok(seen.rpc.includes('ListPrompts'), 'the library was never listed');
-      assert.deepStrictEqual(seen.fetched.sort(), LIBRARY.map((c) => c.id).sort());
+      // Deduplicated: several backups have run by now, each fetching both.
+      assert.deepStrictEqual([...new Set(seen.fetched)].sort(), LIBRARY.map((c) => c.id).sort());
     });
 
     await test('the run is recorded so the next one can be incremental', async () => {
@@ -311,13 +497,14 @@ async function main() {
 
     await test('a changed conversation is picked up on the next run', async () => {
       LIBRARY[0].modified += 5000;
-      const fired = context.waitForEvent('download', { timeout: 120000 });
+      const fired = expectDownload();
       const result = await worker.evaluate(() => globalThis.AISE.schedule.runBackup());
       assert.strictEqual(result.success, true, result.message);
 
       const second = await fired;
       const target = path.join(downloadDir, `second-${second.suggestedFilename()}`);
       await second.saveAs(target);
+      await waitForIdle();
 
       const JSZip = (0, eval)(fs.readFileSync(path.join(ROOT, 'libs', 'jszip.min.js'), 'utf8') + ';JSZip');
       const zip = await JSZip.loadAsync(fs.readFileSync(target));

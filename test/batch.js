@@ -234,8 +234,12 @@ async function main() {
   // can be exercised at a few kilobytes; the byte count itself is a constant,
   // and what needs proving is everything that happens around a split.
 
-  /** Swap in a library of `count` conversations of roughly `size` bytes each. */
-  async function withBigLibrary(count, size, limit, body) {
+  /**
+   * Swap in a library of `count` conversations of roughly `size` bytes each.
+   * `sizeFor` overrides the size of individual conversations by index, which is
+   * how the one-conversation-larger-than-a-whole-volume case is set up.
+   */
+  async function withBigLibrary(count, size, limit, body, sizeFor = () => null) {
     const previousApi = AISE.api;
     const previousLimit = AISE.batch.VOLUME_BYTES;
     const library = Array.from({ length: count }, (_, i) => ({
@@ -249,12 +253,14 @@ async function main() {
       listAllPrompts: async () => library,
       fetchConversation: async (id) => {
         if (id === 'bigFAIL') throw new Error('Prompt unavailable');
-        const summary = library.find((c) => c.id === id);
+        const index = library.findIndex((c) => c.id === id);
+        const summary = library[index];
+        const bytes = sizeFor(index) || size;
         const c = AISE.model.emptyConversation();
         Object.assign(c, { id, title: summary.title, modifiedAt: summary.modifiedAt });
         c.turns = [
           AISE.model.makeTurn('user', `Question in ${id}`),
-          AISE.model.makeTurn('model', `${id} `.repeat(Math.ceil(size / 8))),
+          AISE.model.makeTurn('model', 'x'.repeat(bytes)),
         ];
         AISE.model.recomputeStats(c);
         return c;
@@ -267,6 +273,15 @@ async function main() {
       AISE.api = previousApi;
       AISE.batch.VOLUME_BYTES = previousLimit;
     }
+  }
+
+  /** The rendered size of each conversation in a volume, largest first. */
+  async function volumeSizes(blob) {
+    const files = await readArchive(blob);
+    return Object.keys(files)
+      .filter((f) => f.endsWith('conversation.md'))
+      .map((f) => files[f].length)
+      .sort((a, b) => b - a);
   }
 
   await test('splits into numbered volumes once an archive gets large', async () => {
@@ -303,45 +318,121 @@ async function main() {
     });
   });
 
-  await test('each volume carries its own index and manifest', async () => {
+  await test('every volume accounts for the whole library, not just its own share', async () => {
+    // Splitting the index along with the files left each archive unable to say
+    // where anything else went, so a conversation could be in your downloads
+    // folder with nothing anywhere pointing at it.
     await withBigLibrary(6, 4000, 6000, async () => {
       await runLibrary('markdown');
       const total = downloads.length;
+      assert.ok(total > 1, 'the library did not split, so there is nothing to check');
 
       for (let i = 0; i < total; i++) {
         const files = await readArchive(downloads[i].blob);
-        assert.ok(files['index.md'], `volume ${i + 1} has no index`);
+        const index = files['index.md'];
+        assert.ok(index, `volume ${i + 1} has no index`);
 
         const manifest = JSON.parse(files['manifest.json']);
         assert.strictEqual(manifest.volume, i + 1, `volume number in archive ${i + 1}`);
         assert.strictEqual(manifest.volumeCount, total, `volume count in archive ${i + 1}`);
+        assert.strictEqual(manifest.library.length, 6, `volume ${i + 1} manifest omits part of the library`);
+        for (const entry of manifest.library) {
+          assert.ok(entry.volume >= 1 && entry.volume <= total, `entry has no usable volume: ${entry.title}`);
+        }
 
-        // The index must describe this volume, not the whole run — a link to a
-        // folder that is in another archive resolves to nothing.
-        const listed = [...files['index.md'].matchAll(/\]\(([^)]+)\)/g)]
+        // Every conversation is named, wherever it lives.
+        for (let n = 0; n < 6; n++) {
+          assert.ok(index.includes(`Conversation ${n}`), `volume ${i + 1} index omits Conversation ${n}`);
+        }
+        assert.match(index, new RegExp(`part ${i + 1} of ${total}`), `volume ${i + 1} does not say which part it is`);
+
+        // Links, though, only ever point at files in this same archive.
+        const linked = [...index.matchAll(/\]\(([^)]+)\)/g)]
           .map((m) => decodeURIComponent(m[1]))
           .filter((target) => target.endsWith('conversation.md'));
-        assert.ok(listed.length, `volume ${i + 1} lists nothing`);
-        for (const target of listed) {
+        assert.ok(linked.length, `volume ${i + 1} links to nothing`);
+        for (const target of linked) {
           assert.ok(files[target], `index of volume ${i + 1} links to ${target}, which is not in it`);
         }
-        assert.strictEqual(listed.length, manifest.conversations.length, 'index and manifest disagree');
+        assert.strictEqual(linked.length, manifest.conversations.length, 'index and manifest disagree');
+
+        // And the rest are pointed at the part that does hold them.
+        const elsewhere = manifest.library.filter((e) => e.volume !== i + 1);
+        for (const entry of elsewhere) {
+          assert.match(
+            index,
+            new RegExp(`${entry.title} —[^\\n]*in part ${entry.volume}`),
+            `volume ${i + 1} does not say where ${entry.title} is`
+          );
+        }
       }
     });
   });
 
-  await test('failures are reported once, not in every volume', async () => {
+  await test('a single-volume export still describes the whole library', async () => {
+    await withBigLibrary(3, 100, 100000, async () => {
+      await runLibrary('markdown');
+      const files = await readArchive(downloads[0].blob);
+      const manifest = JSON.parse(files['manifest.json']);
+
+      assert.strictEqual(manifest.library.length, 3, 'library list is missing');
+      assert.deepStrictEqual(manifest.library.map((e) => e.volume), [1, 1, 1]);
+      // Nothing about being split, because it was not.
+      assert.ok(!/in part \d/.test(files['index.md']), files['index.md']);
+      assert.ok(!/This archive/.test(files['index.md']), files['index.md']);
+    });
+  });
+
+  await test('no volume exceeds the limit unless one conversation does', async () => {
+    // The size check used to run *after* a conversation was added, and three
+    // are fetched concurrently, so a volume could overshoot by three whole
+    // conversations. For anyone whose conversations are individually huge —
+    // which is most of the reason volumes exist — that defeated the limit.
+    await withBigLibrary(9, 4000, 10000, async () => {
+      await runLibrary('markdown');
+      assert.ok(downloads.length > 1, 'the library did not split at all');
+
+      for (let i = 0; i < downloads.length; i++) {
+        const sizes = await volumeSizes(downloads[i].blob);
+        const total = sizes.reduce((a, b) => a + b, 0);
+        assert.ok(
+          sizes.length === 1 || total <= 10000,
+          `volume ${i + 1} holds ${sizes.length} conversations totalling ${total} bytes`
+        );
+      }
+    });
+  });
+
+  await test('a conversation larger than a whole volume gets one to itself', async () => {
+    // It cannot be split any further, so the limit has to give — but it must
+    // not drag its neighbours over with it.
+    await withBigLibrary(
+      4, 2000, 10000,
+      async () => {
+        await runLibrary('markdown');
+        const sizes = await Promise.all(downloads.map((d) => volumeSizes(d.blob)));
+        const huge = sizes.find((volume) => volume[0] > 10000);
+        assert.ok(huge, `no volume holds the large conversation: ${JSON.stringify(sizes)}`);
+        assert.strictEqual(huge.length, 1, 'the large conversation shares a volume');
+      },
+      (index) => (index === 1 ? 40000 : null)
+    );
+  });
+
+  await test('failures are reported in every volume', async () => {
+    // A failure list that exists in one archive out of three is a failure list
+    // most people never see.
     await withBigLibrary(6, 4000, 6000, async (library) => {
       library[3].id = 'bigFAIL';
       const result = await runLibrary('markdown');
       assert.strictEqual(result.failures.length, 1, 'the failure is reported');
 
-      const counts = [];
-      for (const download of downloads) {
-        counts.push(JSON.parse((await readArchive(download.blob))['manifest.json']).failures.length);
+      for (let i = 0; i < downloads.length; i++) {
+        const files = await readArchive(downloads[i].blob);
+        const manifest = JSON.parse(files['manifest.json']);
+        assert.strictEqual(manifest.failures.length, 1, `volume ${i + 1} manifest omits the failure`);
+        assert.ok(files['index.md'].includes('Not exported'), `volume ${i + 1} index omits the failure`);
       }
-      assert.strictEqual(counts[0], 1, 'volume 1 carries the failure list');
-      assert.deepStrictEqual(counts.slice(1), counts.slice(1).map(() => 0), 'later volumes repeat it');
     });
   });
 
