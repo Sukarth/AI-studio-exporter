@@ -184,8 +184,8 @@ any failures.
 
 | Field | Notes |
 | --- | --- |
-| `format` | The format id, matching the ids in [formats.md](formats.md). |
-| `volume` / `volumeCount` | Archives are split near 256 MB. See [archives.md](archives.md#large-libraries). |
+| `format` | The format id, matching the ids in [format guide](formats.md). |
+| `volume` / `volumeCount` | Archives are split near 256 MB. See [what you download](archives.md#large-libraries). |
 | `conversations[].modifiedAt` | Epoch **milliseconds** here, not ISO — this file is written by the batch layer, not the JSON formatter. |
 | `failures` | `[{id, title, error}]`. Only present in volume 1; the other volumes carry an empty array. |
 

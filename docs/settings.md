@@ -24,7 +24,7 @@ Off removes those turns entirely. On, each format handles them differently:
 | Obsidian | A `> [!note]-` callout, collapsed by default |
 | PDF, Word | An amber-tinted block with recoloured body text |
 | JSON, CSV | A turn with `isThought: true` / `is_reasoning: true` |
-| JSONL | **Dropped**, unless `jsonlIncludeReasoning` is on — see [formats.md](formats.md#jsonl) |
+| JSONL | **Dropped**, unless `jsonlIncludeReasoning` is on — see [format guide](formats.md#jsonl) |
 
 ### Images (`scrapeImages`) — on
 
@@ -77,7 +77,7 @@ clean transcript and nothing else.
 
 In JSON, a field switched off is **absent**, not `null` — `null` is reserved for
 "AI Studio had no value". See
-[data-reference.md](data-reference.md#json).
+[data reference](data-reference.md#json).
 
 CSV always emits all nine columns; a disabled field leaves its cell empty
 rather than dropping the column, so the file stays parseable.
@@ -124,4 +124,4 @@ Some things are limits of the format, not of a toggle:
 | --- | --- |
 | Non-Latin text becomes `?` in the PDF | The standard PDF fonts are Latin-only. Export HTML and print to PDF from your browser. |
 | An attachment shows a name but no file | The bytes could not be fetched from Drive. `path` is `null` in the JSON. |
-| Everything metadata-ish is missing at once | The export used the DOM fallback. Check `source` in the JSON — see [data-reference.md](data-reference.md#source). |
+| Everything metadata-ish is missing at once | The export used the DOM fallback. Check `source` in the JSON — see [data reference](data-reference.md#source). |

@@ -67,7 +67,7 @@ ai-studio-library-2026-07-31T06-40-38.zip
 `index.md` is a readable listing with a link to each conversation and a section
 for anything that failed. `manifest.json` is the same information for tooling —
 fields documented in
-[data-reference.md](data-reference.md#library-manifest).
+[data reference](data-reference.md#library-manifest).
 
 Folder names come from the conversation title. Two conversations with the same
 title get the second one's id appended: `my-notes (1AbCdE)`.

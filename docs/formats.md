@@ -2,7 +2,7 @@
 
 Nine formats, all rendered from the same conversation model. This page covers
 what each one looks like and what it is good at. For field-level detail on the
-machine-readable three, see [data-reference.md](data-reference.md).
+machine-readable three, see [data reference](data-reference.md).
 
 | Format | Extension | Pro | Ships attachments | Combines in a library export |
 | --- | --- | --- | --- | --- |
@@ -18,7 +18,7 @@ machine-readable three, see [data-reference.md](data-reference.md).
 
 "Ships attachments" means a conversation with files downloads as a `.zip`
 holding the document plus an `attachments/` folder. A conversation with no
-files downloads as a single bare document — see [archives.md](archives.md).
+files downloads as a single bare document — see [what you download](archives.md).
 
 ---
 
@@ -99,7 +99,7 @@ JSON readable and storing each file once instead of base64'd twice.
 }
 ```
 
-Full field reference: [data-reference.md](data-reference.md#json).
+Full field reference: [data reference](data-reference.md#json).
 
 **Good for:** parsing, re-import, feeding another pipeline, or archiving
 against future format changes.
@@ -185,7 +185,7 @@ vault.
 **Collapsible callouts** for reasoning (`> [!note]- 🧠 Reasoning`) and for the
 system instruction, both collapsed by default.
 
-Field meanings match [data-reference.md](data-reference.md#json); the keys are
+Field meanings match [data reference](data-reference.md#json); the keys are
 snake_case here because that is the Dataview convention.
 
 ## CSV
@@ -193,7 +193,7 @@ snake_case here because that is the Dataview convention.
 One row per message, RFC 4180, CRLF line endings, UTF-8 with a BOM so Excel
 reads it as UTF-8 rather than guessing your local codepage.
 
-Columns: [data-reference.md](data-reference.md#csv).
+Columns: [data reference](data-reference.md#csv).
 
 Every field is quoted, whether or not it needs to be. Cells beginning `=`, `+`,
 `-` or `@` are prefixed with an apostrophe — those are executed as formulas when
