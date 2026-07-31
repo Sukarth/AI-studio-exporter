@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const zlib = require('zlib');
 
 const ROOT = path.join(__dirname, '..');
 const BUNDLE = path.join(ROOT, 'vendor', 'pro-documents.bundle.js');
@@ -172,6 +173,128 @@ async function toBytes(blob) {
     assert.strictEqual(bytes.subarray(0, 5).toString('latin1'), '%PDF-', 'PDF header');
     assert.ok(bytes.subarray(-1024).includes(Buffer.from('%%EOF')), 'properly terminated');
     assert.ok(bytes.length > 1000, `expected a populated PDF, got ${bytes.length} bytes`);
+  });
+
+  // --- Markdown, shared by both formats ---------------------------------
+  const { parseBlocks, inlineRuns } = AISE.formats.pdf;
+
+  await test('markdown blocks are recognised, not printed as source', () => {
+    const blocks = parseBlocks([
+      '## Heading',
+      '',
+      'A paragraph that',
+      'wraps in the source.',
+      '',
+      '```js',
+      'const x = 1;',
+      '```',
+      '',
+      '> quoted',
+      '',
+      '- one',
+      '- two',
+      '',
+      '| a | b |',
+      '| --- | --- |',
+      '| 1 | 2 |',
+      '',
+      '---',
+    ].join('\n'));
+
+    assert.deepStrictEqual(blocks.map((b) => b.type),
+      ['heading', 'para', 'code', 'quote', 'list', 'table', 'rule']);
+    assert.strictEqual(blocks[0].level, 2);
+    // Soft-wrapped source lines are one paragraph, as Markdown defines them.
+    assert.strictEqual(blocks[1].runs[0].text, 'A paragraph that wraps in the source.');
+    assert.deepStrictEqual(blocks[2].lines, ['const x = 1;']);
+    assert.strictEqual(blocks[2].lang, 'js');
+    assert.strictEqual(blocks[4].items.length, 2);
+    assert.deepStrictEqual(blocks[5].rows, [['a', 'b'], ['1', '2']]);
+  });
+
+  await test('fenced code keeps its own indentation and markup', () => {
+    // Inside a fence nothing is Markdown: a leading # is a comment, not a
+    // heading, and leading spaces carry meaning.
+    const [block] = parseBlocks('```\n# not a heading\n    indented\n```');
+    assert.strictEqual(block.type, 'code');
+    assert.deepStrictEqual(block.lines, ['# not a heading', '    indented']);
+  });
+
+  await test('an unterminated fence still ends the message cleanly', () => {
+    const [block] = parseBlocks('```py\nprint(1)\nprint(2)');
+    assert.strictEqual(block.type, 'code');
+    assert.deepStrictEqual(block.lines, ['print(1)', 'print(2)']);
+  });
+
+  await test('inline markers only fire when they close', () => {
+    const runs = inlineRuns('a **bold** and `code` and *em* but 2 * 3 stands alone');
+    const styled = runs.filter((r) => r.bold || r.italic || r.code);
+    assert.deepStrictEqual(styled.map((r) => r.text), ['bold', 'code', 'em']);
+    assert.strictEqual(runs.map((r) => r.text).join(''),
+      'a bold and code and em but 2 * 3 stands alone');
+  });
+
+  await test('identifiers keep their underscores', () => {
+    // These conversations are full of snake_case; treating the underscores as
+    // emphasis silently deletes characters from the reader's code.
+    const runs = inlineRuns('call some_long_name(other_arg) then _really_ stop');
+    assert.strictEqual(runs.map((r) => r.text).join(''),
+      'call some_long_name(other_arg) then really stop');
+    assert.deepStrictEqual(runs.filter((r) => r.italic).map((r) => r.text), ['really']);
+  });
+
+  await test('links and bare URLs both become link runs', () => {
+    const runs = inlineRuns('see [docs](https://x.test/a) or https://y.test/b, then stop');
+    const links = runs.filter((r) => r.link);
+    assert.deepStrictEqual(links.map((r) => [r.text, r.link]), [
+      ['docs', 'https://x.test/a'],
+      ['https://y.test/b', 'https://y.test/b'],
+    ]);
+    // The comma is sentence punctuation, not part of the address.
+    assert.ok(runs.map((r) => r.text).join('').endsWith(', then stop'));
+  });
+
+  await test('pdf embeds a link annotation per attachment and URL', async () => {
+    // The visible blue text is cosmetic; only the annotation makes it
+    // clickable, and it lives inside a compressed object stream where a plain
+    // byte search cannot see it.
+    const c = fixture();
+    c.url = 'https://aistudio.google.com/prompts/ABC123';
+    c.turns[0].parts = [{ name: 'a file.png', mimeType: 'image/png', type: 'image' }];
+    const paths = new Map([[c.turns[0].parts[0], 'attachments/a file.png']]);
+
+    const bytes = await toBytes(await AISE.formats.pdf.render(c, SETTINGS, paths));
+    const uris = new Set();
+    let cursor = 0;
+    while (true) {
+      const start = bytes.indexOf('stream', cursor);
+      if (start === -1) break;
+      let from = start + 6;
+      if (bytes[from] === 13) from++;
+      if (bytes[from] === 10) from++;
+      const end = bytes.indexOf('endstream', from);
+      if (end === -1) break;
+      try {
+        const text = zlib.inflateSync(bytes.subarray(from, end)).toString('latin1');
+        for (const m of text.matchAll(/\/Subtype \/Link[\s\S]*?\/URI \(([^)]*)\)/g)) uris.add(m[1]);
+      } catch (_) { /* content streams and images are not object streams */ }
+      cursor = end + 9;
+    }
+
+    assert.ok(uris.has('https://aistudio.google.com/prompts/ABC123'), 'source URL is clickable');
+    // Spaces must be encoded or a reader stops the URI at the first one.
+    assert.ok(uris.has('attachments/a%20file.png'), `attachment link missing, got ${[...uris]}`);
+  });
+
+  await test('docx hyperlinks its attachments too', async () => {
+    const c = fixture();
+    c.turns[0].parts = [{ name: 'a file.png', mimeType: 'image/png', type: 'image' }];
+    const paths = new Map([[c.turns[0].parts[0], 'attachments/a file.png']]);
+
+    const zip = await JSZip.loadAsync(await toBytes(await AISE.formats.docx.render(c, SETTINGS, paths)));
+    const rels = await zip.files['word/_rels/document.xml.rels'].async('string');
+    assert.ok(rels.includes('attachments/a%20file.png'), 'relationship targets the asset');
+    assert.ok(/TargetMode="External"/.test(rels), 'declared as an external link');
   });
 
   await test('pdf warns when text needs glyphs the bundled font lacks', () => {

@@ -32,3 +32,6 @@ yarn-error.log*
 !ai-studio-exporter-*.zip
 
 # vendor/ holds the committed build output - intentionally tracked
+
+# Locally generated sample exports, for eyeballing format changes
+samples/
