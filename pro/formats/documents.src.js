@@ -115,7 +115,41 @@ function buildDocx(conversation, settings) {
   return new Document({ sections: [{ children }] });
 }
 
-const renderDocx = (conversation, settings) => Packer.toBlob(buildDocx(conversation, settings));
+/**
+ * Word refuses to open a package whose `[Content_Types].xml` is not the first
+ * entry in the archive — "Word experienced an error trying to open the file",
+ * with no hint as to why. OPC (ECMA-376 Part 2) requires that ordering, and
+ * Packer emits it seventh, so every document produced here was unopenable.
+ *
+ * Rebuilding the archive with the content-types part first is the whole fix.
+ * The parts themselves are untouched.
+ */
+async function withContentTypesFirst(blob) {
+  const Zip = globalThis.JSZip;
+  if (!Zip) throw new Error('JSZip is required to finalise a .docx package');
+
+  const CONTENT_TYPES = '[Content_Types].xml';
+  const source = await Zip.loadAsync(await blob.arrayBuffer());
+  const names = Object.keys(source.files).filter((name) => !source.files[name].dir);
+  if (names[0] === CONTENT_TYPES) return blob;
+  if (!names.includes(CONTENT_TYPES)) throw new Error('.docx package has no [Content_Types].xml');
+
+  const out = new Zip();
+  out.file(CONTENT_TYPES, await source.files[CONTENT_TYPES].async('uint8array'));
+  for (const name of names) {
+    if (name === CONTENT_TYPES) continue;
+    out.file(name, await source.files[name].async('uint8array'));
+  }
+
+  return out.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+}
+
+const renderDocx = async (conversation, settings) =>
+  withContentTypesFirst(await Packer.toBlob(buildDocx(conversation, settings)));
 
 // --- PDF -----------------------------------------------------------------
 
