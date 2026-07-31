@@ -32,6 +32,8 @@ Version 2 talks to AI Studio's own API instead of scraping the page. A 200-messa
 | CSV | `.csv` | Pro — one row per message |
 | JSONL | `.jsonl` | Pro — ready for fine-tuning |
 
+**[Format documentation →](docs/README.md)** — what each format contains, every field in the JSON, JSONL and CSV exports, what lands in a `.zip`, and which setting removes what.
+
 ## 💎 Pro
 
 A one-time payment. No subscription, no account, and the code stays open.

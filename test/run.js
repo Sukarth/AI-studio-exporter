@@ -927,6 +927,67 @@ test('url helpers separate prompt pages from the rest of AI Studio', () => {
   assert.ok(!isAIStudioUrl('http://aistudio.google.com/prompts/ABC'), 'http is rejected');
 });
 
+// --- documentation ------------------------------------------------------
+//
+// Docs that describe fields drift the moment a field is added, and nothing
+// else in the suite would notice. These assert coverage, not prose.
+
+test('every setting is documented', () => {
+  const docs = fs.readFileSync(path.join(ROOT, 'docs', 'settings.md'), 'utf8');
+  const undocumented = Object.keys(SETTINGS.AI_STUDIO_DEFAULT_SETTINGS)
+    .filter((key) => !docs.includes(key));
+  assert.deepStrictEqual(undocumented, [], 'settings missing from docs/settings.md');
+});
+
+test('every format is documented', () => {
+  const docs = fs.readFileSync(path.join(ROOT, 'docs', 'formats.md'), 'utf8');
+  const undocumented = SETTINGS.AI_STUDIO_FORMATS
+    .filter((entry) => !new RegExp(`#${entry.id}\\b|\\b${entry.id}\\b`, 'i').test(docs))
+    .map((entry) => entry.id);
+  assert.deepStrictEqual(undocumented, [], 'formats missing from docs/formats.md');
+});
+
+test('every documented JSON field is one the formatter emits', () => {
+  // The reverse direction: a field renamed in code leaves the docs describing
+  // something that no longer exists, which is worse than an omission.
+  const docs = fs.readFileSync(path.join(ROOT, 'docs', 'data-reference.md'), 'utf8');
+  const conversation = AISE.model.emptyConversation('ABC123', 'api');
+  conversation.config = {
+    model: 'models/gemini-3-pro', temperature: 1, topP: 0.95, topK: 64,
+    maxOutputTokens: 1024, safetySettings: [],
+  };
+  conversation.systemInstruction = 'Be brief.';
+  conversation.modifiedAt = 1750000000000;
+  conversation.turns = [
+    AISE.model.makeTurn('user', 'Hi', { tokenCount: 1, timestamp: 1750000000000 }),
+    AISE.model.makeTurn('model', 'Hello', { tokenCount: 1 }),
+  ];
+  conversation.turns[0].parts = [
+    { type: 'file', name: 'a.txt', mimeType: 'text/plain', driveId: 'x', byteLength: 3 },
+  ];
+  AISE.model.recomputeStats(conversation);
+  const payload = JSON.parse(
+    AISE.formats.json.render(conversation, ALL_ON, new Map([[conversation.turns[0].parts[0], 'attachments/a.txt']]))
+  );
+
+  const emitted = new Set([
+    ...Object.keys(payload),
+    ...Object.keys(payload.config),
+    ...Object.keys(payload.stats),
+    ...Object.keys(payload.turns[0]),
+    ...Object.keys(payload.turns[0].parts[0]),
+    'excludedAttachments', // only emitted when non-zero
+  ]);
+
+  // Every `| \`name\` |` row in the JSON section must name a real field.
+  const jsonSection = docs.slice(docs.indexOf('## JSON'), docs.indexOf('## JSONL'));
+  const claimed = [...jsonSection.matchAll(/^\| `([A-Za-z][\w.]*)` \|/gm)].map((m) => m[1]);
+  assert.ok(claimed.length > 20, `expected a full field table, found ${claimed.length} rows`);
+
+  const stale = claimed.filter((name) => !emitted.has(name) && !name.includes('.'));
+  assert.deepStrictEqual(stale, [], 'documented JSON fields the formatter does not emit');
+});
+
 // --- report -------------------------------------------------------------
 
 for (const { name, error } of failures) {

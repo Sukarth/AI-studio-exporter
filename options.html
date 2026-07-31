@@ -234,6 +234,22 @@
     </section>
 
     <section>
+      <h2>Fine-tuning dataset <span class="badge">PRO</span></h2>
+      <p class="hint">
+        Applies to the JSONL export only.
+        <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/formats.md#jsonl"
+           target="_blank" rel="noopener">What goes in a JSONL export</a>
+      </p>
+
+      <div class="row">
+        <input type="checkbox" id="jsonlIncludeReasoning">
+        <label for="jsonlIncludeReasoning">Include reasoning in the dataset
+          <small>Off by default: training on a model's private thinking as if it were the
+            reply teaches it to emit thinking as output.</small></label>
+      </div>
+    </section>
+
+    <section>
       <h2>Scheduled backup <span class="badge">PRO</span></h2>
       <p class="hint">
         Backs up only what changed since last time, so a routine run is quick.
@@ -283,6 +299,7 @@
 
     <footer>
       v<span id="version"></span> &middot;
+      <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/README.md" target="_blank" rel="noopener noreferrer">What each format contains</a> &middot;
       <a href="https://github.com/Sukarth/AI-studio-exporter" target="_blank" rel="noopener noreferrer">Open source on GitHub</a>
     </footer>
   </main>

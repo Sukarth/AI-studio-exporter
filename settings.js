@@ -42,6 +42,11 @@ const AI_STUDIO_DEFAULT_SETTINGS = Object.freeze({
   includeTokenCounts: true,
   includeSourceUrl: true,
 
+  // JSONL only. Off because training on a model's private reasoning as if it
+  // were the reply teaches it to emit reasoning as output; people building
+  // reasoning datasets specifically want the opposite.
+  jsonlIncludeReasoning: false,
+
   defaultFormat: 'markdown',
   loadDelay: 700,
 });
