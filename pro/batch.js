@@ -24,6 +24,11 @@
   // counts pre-compression bytes, but it is the number that predicts memory.
   const VOLUME_BYTES = 256 * 1024 * 1024;
 
+  // Read through the export rather than closing over the constant, so the
+  // splitting logic can be tested at a threshold of a few kilobytes instead of
+  // by generating a quarter of a gigabyte of conversations.
+  const volumeLimit = () => Number(AISE.batch && AISE.batch.VOLUME_BYTES) || VOLUME_BYTES;
+
   // Conversations fetched concurrently. The bottleneck is Google's per-user
   // rate limit rather than local CPU.
   const CONCURRENCY = 3;
@@ -244,7 +249,7 @@
           `Exporting conversations… ${failures.length ? `(${failures.length} failed)` : ''}`.trim(),
           `${done} / ${selected.length}`
         );
-        if (!concatenate && bufferedBytes >= VOLUME_BYTES) await flushVolume();
+        if (!concatenate && bufferedBytes >= volumeLimit()) await flushVolume();
       }
     };
 

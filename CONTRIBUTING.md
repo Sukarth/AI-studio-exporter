@@ -52,6 +52,7 @@ npm test              # the dependency-free suite
 npm run test:core     # just the unit tests
 npm run test:ui       # popup, options and service worker in a real Chrome
 npm run test:ui:export # a full export, end to end, in a real Chrome
+npm run test:ui:alarm  # a scheduled backup, fired by Chrome's own alarm
 npm run test:all      # all of the above
 ```
 
@@ -63,7 +64,10 @@ below and skips itself when it is absent.
 itself — no literal control characters in source, every id the extension pages
 reach for exists in their markup, every fetched origin has a host permission.
 `test/batch.js` drives whole-library export end to end with only the API and
-the download faked. `test/license.js` fakes storage and the network to cover
+the download faked, including volume splitting: production starts a new archive
+at 256 MB, and the threshold is read through `AISE.batch.VOLUME_BYTES` so the
+splitting logic can be exercised at a few kilobytes rather than by generating a
+quarter of a gigabyte of conversations. `test/license.js` fakes storage and the network to cover
 the cases that decide whether a paying user keeps access — Polar unreachable, a
 revoked key, an activation slot being released. `test/attachments.js` fakes
 Drive and counts requests, because most of what matters there is about requests
@@ -71,7 +75,7 @@ that should *not* happen.
 
 ### Browser tests
 
-`test/ui.js` and `test/ui-export.js` need Playwright, which is a devDependency:
+The three browser suites need Playwright, which is a devDependency:
 
 ```bash
 npm install
@@ -88,6 +92,15 @@ that real origin — which is what decides whether Chrome injects the content
 scripts — while the body is ours. The MakerSuite RPC and Drive are answered with
 canned wire-format fixtures, and the downloaded archive is read back off disk
 and checked byte for byte.
+
+`test/ui-alarm.js` covers scheduled backups the only way that proves anything:
+it registers a real `chrome.alarms` alarm and waits for Chrome to fire it,
+rather than calling `runBackup()`. If the alarm never fires, or the service
+worker is not around to hear it, no download appears and the test fails. Chrome
+honours a sub-minute delay for an unpacked extension — the archive lands about
+a second after the alarm is armed — and clamps to a minute otherwise, which the
+timeout accommodates. The scheduling contract, that a daily backup arms a
+1440-minute alarm, is asserted against the alarm `configure()` really creates.
 
 Two constraints worth knowing before you edit them:
 

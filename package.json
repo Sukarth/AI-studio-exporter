@@ -10,7 +10,8 @@
     "test:core": "node test/run.js",
     "test:ui": "node test/ui.js",
     "test:ui:export": "node test/ui-export.js",
-    "test:all": "npm test && npm run test:ui && npm run test:ui:export"
+    "test:all": "npm test && npm run test:ui && npm run test:ui:export && npm run test:ui:alarm",
+    "test:ui:alarm": "node test/ui-alarm.js"
   },
   "keywords": [
     "chrome-extension",
