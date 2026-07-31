@@ -718,6 +718,58 @@ test('html renders fenced code without letting it escape the block', () => {
   assert.ok(rendered.includes('&lt;'), 'angle bracket stayed escaped');
 });
 
+test('html renders a heading followed immediately by text', () => {
+  // The old block parser tested each blank-line-separated chunk as a whole, so
+  // a heading with prose on the next line stayed literal "## ..." on the page.
+  const html = AISE.formats.html.renderMarkdown(
+    AISE.formats.html.escapeHtml('## Results\nThe model improved.')
+  );
+  assert.ok(/<h3>Results<\/h3>/.test(html), html);
+  assert.ok(!html.includes('## Results'), 'heading markup left as text');
+});
+
+test('html renders a markdown table as a table', () => {
+  // Left as plain text, a wide table was what pushed content past the page.
+  const source = '| Epsilon | Accuracy |\n|---|---|\n| 0 | 96.28% |\n| 0.04 | 47.24% |';
+  const html = AISE.formats.html.renderMarkdown(AISE.formats.html.escapeHtml(source));
+  assert.ok(html.includes('<table>'), html);
+  assert.ok(html.includes('<th>Epsilon</th>'), 'header cells');
+  assert.ok(html.includes('<td>96.28%</td>'), 'body cells');
+  assert.ok(html.includes('class="table-wrap"'), 'wrapped so it scrolls rather than overflows');
+});
+
+test('html renders ordered lists and blockquotes', () => {
+  const { escapeHtml, renderMarkdown } = AISE.formats.html;
+  assert.ok(renderMarkdown(escapeHtml('1. first\n2. second')).includes('<ol>'));
+  // ">" is "&gt;" by the time the block parser sees it.
+  assert.ok(renderMarkdown(escapeHtml('> quoted line')).includes('<blockquote>'));
+});
+
+test('html collapses reasoning behind a disclosure', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const html = AISE.formats.html.render(c, ALL_ON, new Map());
+  assert.ok(html.includes('<details class="thought">'), 'reasoning is a details element');
+  assert.ok(!/<details class="thought"[^>]*\bopen\b/.test(html), 'and starts closed');
+  // The answer must never be hidden.
+  assert.ok(html.includes('<article class="turn model">'), 'answers stay open');
+});
+
+test('html stacks attachment links instead of lining them up', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const part = c.turns.flatMap((t) => t.parts).find((p) => p.driveId);
+  part.name = 'notes.pdf';
+  part.type = 'file';
+  const html = AISE.formats.html.render(c, ALL_ON, new Map([[part, 'attachments/notes.pdf']]));
+  assert.ok(html.includes('class="attachments"'), 'links share a column container');
+});
+
+test('html keeps long unbroken text inside the page', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const html = AISE.formats.html.render(c, ALL_ON, new Map());
+  assert.ok(/overflow-wrap:anywhere/.test(html), 'prose wraps rather than overflowing');
+  assert.ok(/\.table-wrap\s*\{[^}]*overflow-x:auto/.test(html), 'tables scroll in their own box');
+});
+
 test('html output is a complete standalone document', () => {
   const c = AISE.decode.decodeConversation(wirePrompt());
   const html = AISE.formats.html.render(c, ALL_ON, new Map());

@@ -38,6 +38,124 @@
     return Buffer.from(bytes).toString('base64');
   }
 
+  const inline = (text) =>
+    text
+      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      // Only http(s) links become anchors; javascript: and data: never do.
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" rel="noopener noreferrer" target="_blank">$1</a>');
+
+  /** A `| a | b |` row split into its cells. */
+  const tableCells = (line) =>
+    line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+
+  const isTableRule = (line) => /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(line) && line.includes('-');
+
+  /**
+   * Line-based block parser over already-escaped text.
+   *
+   * The previous version split on blank lines and tested each chunk as a whole,
+   * so a heading with text on the next line never matched and rendered as
+   * literal "## ...". Walking line by line also makes tables possible, which
+   * matters more than it sounds: a wide Markdown table left as plain text was
+   * what pushed content past the page width.
+   */
+  function renderBlocks(text) {
+    const lines = text.split('\n');
+    const out = [];
+    let i = 0;
+
+    const flushParagraph = (buffer) => {
+      if (!buffer.length) return;
+      out.push(`<p>${inline(buffer.join('\n')).replace(/\n/g, '<br>')}</p>`);
+      buffer.length = 0;
+    };
+
+    const paragraph = [];
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        flushParagraph(paragraph);
+        i++;
+        continue;
+      }
+
+      const heading = /^(#{1,6})\s+(.+)$/.exec(trimmed);
+      if (heading) {
+        flushParagraph(paragraph);
+        // Shift down one level so a message's own H1 never competes with the
+        // conversation title.
+        const level = Math.min(heading[1].length + 1, 6);
+        out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+        i++;
+        continue;
+      }
+
+      if (/^(?:---+|\*\*\*+|___+)$/.test(trimmed)) {
+        flushParagraph(paragraph);
+        out.push('<hr>');
+        i++;
+        continue;
+      }
+
+      // Table: a header row followed by a |---|---| rule.
+      if (trimmed.includes('|') && i + 1 < lines.length && isTableRule(lines[i + 1])) {
+        flushParagraph(paragraph);
+        const header = tableCells(trimmed);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
+          rows.push(tableCells(lines[i]));
+          i++;
+        }
+        const head = header.map((c) => `<th>${inline(c)}</th>`).join('');
+        const body = rows
+          .map((cells) => `<tr>${cells.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`)
+          .join('');
+        out.push(`<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`);
+        continue;
+      }
+
+      // Blockquote. `>` is `&gt;` by the time it reaches here.
+      if (/^&gt;\s?/.test(trimmed)) {
+        flushParagraph(paragraph);
+        const quoted = [];
+        while (i < lines.length && /^&gt;\s?/.test(lines[i].trim())) {
+          quoted.push(lines[i].trim().replace(/^&gt;\s?/, ''));
+          i++;
+        }
+        out.push(`<blockquote>${renderBlocks(quoted.join('\n'))}</blockquote>`);
+        continue;
+      }
+
+      const bullet = /^[-*+]\s+(.*)$/.exec(trimmed);
+      const numbered = /^\d+[.)]\s+(.*)$/.exec(trimmed);
+      if (bullet || numbered) {
+        flushParagraph(paragraph);
+        const ordered = !!numbered;
+        const items = [];
+        while (i < lines.length) {
+          const t = lines[i].trim();
+          const m = ordered ? /^\d+[.)]\s+(.*)$/.exec(t) : /^[-*+]\s+(.*)$/.exec(t);
+          if (!m) break;
+          items.push(`<li>${inline(m[1])}</li>`);
+          i++;
+        }
+        out.push(ordered ? `<ol>${items.join('')}</ol>` : `<ul>${items.join('')}</ul>`);
+        continue;
+      }
+
+      paragraph.push(trimmed);
+      i++;
+    }
+    flushParagraph(paragraph);
+
+    return out.join('\n');
+  }
+
   /**
    * Render a deliberately small Markdown subset. Input must already be escaped.
    * Anything unsupported degrades to plain text rather than being dropped.
@@ -48,40 +166,13 @@
     let cursor = 0;
     let match;
 
-    const inline = (text) =>
-      text
-        .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-        // Only http(s) links become anchors; javascript: and data: never do.
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" rel="noopener noreferrer" target="_blank">$1</a>');
-
-    const paragraphs = (text) =>
-      text
-        .split(/\n{2,}/)
-        .map((chunk) => {
-          const trimmed = chunk.trim();
-          if (!trimmed) return '';
-          const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed);
-          if (heading) {
-            const level = Math.min(heading[1].length + 1, 6);
-            return `<h${level}>${inline(heading[2])}</h${level}>`;
-          }
-          if (/^[-*]\s+/m.test(trimmed) && trimmed.split('\n').every((l) => /^[-*]\s+/.test(l.trim()))) {
-            const items = trimmed.split('\n').map((l) => `<li>${inline(l.trim().replace(/^[-*]\s+/, ''))}</li>`);
-            return `<ul>${items.join('')}</ul>`;
-          }
-          return `<p>${inline(trimmed).replace(/\n/g, '<br>')}</p>`;
-        })
-        .join('\n');
-
     while ((match = fencePattern.exec(escaped)) !== null) {
-      blocks.push(paragraphs(escaped.slice(cursor, match.index)));
+      blocks.push(renderBlocks(escaped.slice(cursor, match.index)));
       const language = match[1] ? ` data-language="${match[1]}"` : '';
       blocks.push(`<pre${language}><code>${match[2].replace(/\n$/, '')}</code></pre>`);
       cursor = match.index + match[0].length;
     }
-    blocks.push(paragraphs(escaped.slice(cursor)));
+    blocks.push(renderBlocks(escaped.slice(cursor)));
 
     return blocks.filter(Boolean).join('\n');
   }
@@ -109,13 +200,42 @@
     .turn header .sub { font-weight:400; color:var(--muted); font-size:.8rem; }
     .turn :first-child { margin-top:0; }
     .turn :last-child { margin-bottom:0; }
-    pre { background:rgba(127,127,127,.12); padding:.85rem 1rem; border-radius:8px; overflow-x:auto; }
+    /* A single unbroken line - an ASCII table, a long URL - must not push the
+       card past the page. Wrapping is preferable to a clipped message. */
+    .turn p, .turn li, .turn td, .turn th, .turn blockquote { overflow-wrap:anywhere; }
+    pre { background:rgba(127,127,127,.12); padding:.85rem 1rem; border-radius:8px;
+      overflow-x:auto; max-width:100%; }
     code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em; }
     pre code { font-size:.85em; }
+    /* Wide tables scroll inside their own box rather than widening the page. */
+    .table-wrap { overflow-x:auto; max-width:100%; margin:.75rem 0; }
+    table { border-collapse:collapse; font-size:.9em; }
+    th, td { border:1px solid var(--line); padding:.4rem .6rem; text-align:left; vertical-align:top; }
+    th { background:rgba(127,127,127,.1); font-weight:600; }
+    blockquote { margin:.75rem 0; padding:.1rem 0 .1rem 1rem; border-left:3px solid var(--line);
+      color:var(--muted); }
+    hr { border:none; border-top:1px solid var(--line); margin:1.25rem 0; }
+    h2,h3,h4,h5,h6 { line-height:1.3; margin:1.25rem 0 .5rem; }
     img { max-width:100%; height:auto; border-radius:8px; }
-    .attachment { display:inline-block; padding:.4rem .7rem; border:1px solid var(--line);
-      border-radius:8px; font-size:.85rem; margin:.25rem .25rem .25rem 0; }
+    /* One per line: a row of side-by-side chips is unreadable once filenames
+       are long, which they usually are. */
+    .attachments { display:flex; flex-direction:column; align-items:flex-start; gap:.35rem;
+      margin:0 0 .75rem; }
+    .attachment { display:block; max-width:100%; padding:.4rem .7rem; border:1px solid var(--line);
+      border-radius:8px; font-size:.85rem; overflow-wrap:anywhere; }
     .attachment.missing { opacity:.65; font-style:italic; }
+    /* Reasoning is collapsed by default: it is usually far longer than the
+       answer and most readers want the answer. */
+    details.thought { border:1px solid var(--line); border-radius:12px; background:var(--thought);
+      margin-bottom:1rem; }
+    details.thought > summary { cursor:pointer; padding:1rem 1.25rem; font-weight:600;
+      font-size:.9rem; list-style:none; display:flex; gap:.75rem; align-items:baseline; }
+    details.thought > summary::-webkit-details-marker { display:none; }
+    details.thought > summary::before { content:'▸'; color:var(--muted); }
+    details.thought[open] > summary::before { content:'▾'; }
+    details.thought > summary .sub { font-weight:400; color:var(--muted); font-size:.8rem; }
+    details.thought .body { padding:0 1.25rem 1rem; }
+    details.thought .body > :first-child { margin-top:0; }
     footer { margin-top:2rem; padding-top:1rem; border-top:1px solid var(--line);
       color:var(--muted); font-size:.8rem; text-align:center; }
     @media print { body { padding:0; } .turn { break-inside:avoid; border-color:#ccc; background:none; } }
@@ -165,11 +285,26 @@
       const excluded = turn.excludedAttachments || 0;
       if (excluded) sub.push(`${excluded} attachment${excluded === 1 ? '' : 's'} not included in export`);
 
-      const media = turn.parts.map((part) => renderPart(part, paths.get(part))).join('\n');
+      const images = turn.parts.filter((p) => p.type === 'image' && p.buffer);
+      const links = turn.parts.filter((p) => !(p.type === 'image' && p.buffer));
+      const media =
+        images.map((part) => renderPart(part, paths.get(part))).join('\n') +
+        (links.length
+          ? `<div class="attachments">${links.map((p) => renderPart(p, paths.get(p))).join('')}</div>`
+          : '');
       const body = turn.text ? renderMarkdown(escapeHtml(turn.text)) : '';
+      const subHtml = sub.length ? `<span class="sub">${escapeHtml(sub.join(' · '))}</span>` : '';
+
+      // Reasoning collapses; it is usually longer than the answer it precedes.
+      if (turn.isThought) {
+        return `<details class="thought">
+  <summary><span>${label}</span>${subHtml}</summary>
+  <div class="body">${media}${body}</div>
+</details>`;
+      }
 
       return `<article class="turn ${kind}">
-  <header><span>${label}</span>${sub.length ? `<span class="sub">${escapeHtml(sub.join(' · '))}</span>` : ''}</header>
+  <header><span>${label}</span>${subHtml}</header>
   ${media}
   ${body}
 </article>`;
