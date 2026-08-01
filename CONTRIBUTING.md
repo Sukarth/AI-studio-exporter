@@ -71,7 +71,10 @@ quarter of a gigabyte of conversations. `test/license.js` fakes storage and the 
 the cases that decide whether a paying user keeps access — Polar unreachable, a
 revoked key, an activation slot being released. `test/attachments.js` fakes
 Drive and counts requests, because most of what matters there is about requests
-that should *not* happen.
+that should *not* happen. `test/badge.js` freezes `Date.now` so the toolbar
+badge's expiry window is something to step over rather than sleep through, and
+concentrates on what must *not* vanish: a failure survives a service worker
+restart, and stays gone once the popup has acknowledged it.
 
 ### Browser tests
 
@@ -91,7 +94,11 @@ fulfils requests to `https://aistudio.google.com/**` itself, so the page carries
 that real origin — which is what decides whether Chrome injects the content
 scripts — while the body is ours. The MakerSuite RPC and Drive are answered with
 canned wire-format fixtures, and the downloaded archive is read back off disk
-and checked byte for byte.
+and checked byte for byte. It also reads the toolbar badge back out of
+`chrome.action`, which is the only way to know Chrome painted what the code
+asked for. Catching the progress overlay mid-export needs the network to be
+slow, so the RPC mock honours a one-shot `seen.stallMs` delay — without it the
+overlay exists for a couple of frames.
 
 `test/ui-alarm.js` covers scheduled backups the only way that proves anything:
 it registers a real `chrome.alarms` alarm and waits for Chrome to fire it,
