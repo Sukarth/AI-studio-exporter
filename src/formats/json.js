@@ -1,5 +1,5 @@
 /**
- * JSON formatter — the full normalized model, minus the raw asset bytes.
+ * JSON formatter: the full normalized model, minus the raw asset bytes.
  *
  * This is the lossless format: anything the extractor captured is here, so it
  * doubles as the input for re-import and for the Pro converters. Asset bytes

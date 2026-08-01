@@ -4,237 +4,292 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Studio Exporter — Settings</title>
+  <title>AI Studio Exporter settings</title>
+  <link rel="stylesheet" href="theme.css">
   <style>
-    :root {
-      --bg: #1a1b1e;
-      --card: #25262b;
-      --text: #e9ecef;
-      --muted: #a5a5a5;
-      --accent: #667eea;
-      --border: #2c2e33;
-    }
+    body { padding: 48px 24px 96px; }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.55;
-      padding: 32px 16px 64px;
-    }
-
-    main { max-width: 680px; margin: 0 auto; }
-
-    h1 {
-      font-size: 24px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 4px;
-    }
-
-    .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
-
-    section {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 22px;
-      margin-bottom: 18px;
-    }
-
-    section h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-    section .hint { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
-
-    .row {
-      display: flex;
-      align-items: flex-start;
-      gap: 11px;
-      padding: 9px 0;
-      border-top: 1px solid var(--border);
-    }
-    .row:first-of-type { border-top: none; }
-
-    .row input[type="checkbox"] { margin-top: 3px; width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
-    .row label { flex: 1; cursor: pointer; font-size: 13.5px; }
-    .row label small { display: block; color: var(--muted); font-size: 12px; }
-
-    .sub-options { margin-left: 26px; padding-left: 12px; border-left: 2px solid var(--border); }
-
-    .field { margin-top: 14px; }
-    .field > span { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 5px; }
-
-    select, input[type="number"], input[type="text"] {
+    main {
       width: 100%;
-      padding: 9px 11px;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      font-size: 13.5px;
-      font-family: inherit;
+      max-width: 640px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
     }
-    select:focus, input:focus { outline: none; border-color: var(--accent); }
 
-    button {
-      padding: 9px 16px;
-      border-radius: 7px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text);
-      font-family: inherit;
-      white-space: nowrap;
+    .page-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+    .page-head h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .page-head .build { font-family: var(--mono); font-size: 11px; color: var(--dimmer); }
+    .page-head .build .tier { color: var(--accent-soft); }
+
+    .lede { margin: -12px 0 0; font-size: 12.5px; color: var(--dim); }
+
+    /* A group of settings that needs no container of its own. */
+    .group { display: flex; flex-direction: column; gap: 12px; }
+    /* A group that is a thing in its own right: licence, backups. */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px;
+      border-radius: var(--r-xl);
+      background: var(--raised);
+      border: 1px solid var(--line-soft);
     }
-    button:hover:not(:disabled) { border-color: var(--accent); }
-    button.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: #fff; }
-    button:disabled { opacity: .5; cursor: not-allowed; }
+    .panel.is-locked { opacity: 0.55; }
+    .panel-head { display: flex; align-items: center; gap: 9px; }
+    .group > .hint, .panel > .hint { margin: -4px 0 0; font-size: 12px; color: var(--dim); }
+    .group > .hint a, .panel > .hint a, .lede a { color: var(--accent-soft); text-decoration: none; }
+    .group > .hint a:hover, .panel > .hint a:hover { text-decoration: underline; }
 
-    .actions { display: flex; gap: 10px; margin-top: 12px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    .row .what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .row .what strong { font-size: 13.5px; font-weight: 600; }
+    .row .what span { font-size: 12px; color: var(--dim); }
+    .row .select, .row .input { width: 200px; flex: 0 0 auto; }
 
-    .inline { display: flex; gap: 10px; align-items: flex-end; }
-    .inline .field { flex: 1; margin-top: 0; }
+    .rule { height: 1px; background: var(--divider); }
 
-    .badge {
-      font-size: 10px; font-weight: 700; letter-spacing: .05em;
-      padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 7px;
-      background: rgba(102,126,234,.18); color: #a5b4fc; border: 1px solid rgba(102,126,234,.35);
-    }
-    .badge.ok { background: rgba(43,138,62,.18); color: #69db7c; border-color: rgba(43,138,62,.4); }
+    .sub { display: flex; flex-direction: column; gap: 12px; padding-left: 16px; border-left: 1px solid var(--divider); }
+    .sub.is-off { opacity: 0.45; }
 
-    .notice { padding: 10px 12px; border-radius: 7px; font-size: 12.5px; margin-top: 12px; display: none; }
-    .notice.success { display: block; background: rgba(43,138,62,.15); color: #69db7c; border: 1px solid rgba(43,138,62,.3); }
-    .notice.error { display: block; background: rgba(201,42,42,.15); color: #ff8787; border: 1px solid rgba(201,42,42,.3); }
-    .notice.info { display: block; background: rgba(102,126,234,.12); color: #a5b4fc; border: 1px solid rgba(102,126,234,.3); }
+    .split { display: flex; gap: 12px; }
+    .split > label { flex: 1; display: flex; flex-direction: column; gap: 5px; }
 
-    .locked { opacity: .5; pointer-events: none; }
+    .licence-active { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .licence-active .who { display: flex; align-items: center; gap: 10px; }
+    .licence-key { font-family: var(--mono); font-size: 12.5px; color: var(--text-3); }
 
-    .toast {
-      position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px);
-      background: #2b8a3e; color: #fff; padding: 11px 20px; border-radius: 8px;
-      font-size: 13px; font-weight: 500; transition: transform .25s ease; z-index: 50;
-    }
-    .toast.show { transform: translateX(-50%) translateY(0); }
-
-    footer { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 26px; }
-    footer a { color: var(--muted); }
+    .page-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 4px; }
+    .page-foot .links { display: flex; align-items: center; gap: 16px; font-size: 12.5px; }
+    .page-foot a { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); text-decoration: none; }
+    .page-foot a:hover { color: var(--text); }
+    .page-foot svg { width: 15px; height: 15px; }
   </style>
 </head>
 
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m6 9.5 6 6 6-6"></path>
+      </symbol>
+      <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m9 8.5-4 3.5 4 3.5"></path><path d="m15 8.5 4 3.5-4 3.5"></path>
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5"></path>
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m5 12.5 4.5 4.5L19 7"></path>
+      </symbol>
+    </defs>
+  </svg>
+
   <main>
-    <h1>AI Studio Exporter</h1>
-    <p class="subtitle">
-      Settings are stored in your browser and sync with your Chrome profile.
-      Nothing about your conversations is ever sent anywhere.
+    <div class="page-head">
+      <h1>Settings</h1>
+      <span class="build">AI Studio Exporter v<span id="version"></span><span id="tierLabel" hidden> &middot; <span class="tier">Pro</span></span></span>
+    </div>
+    <p class="lede">
+      Stored in your browser and synced with your Chrome profile. Nothing about your
+      conversations is ever sent anywhere.
     </p>
 
-    <section>
-      <h2>Pro <span id="proBadge" class="badge">LOCKED</span></h2>
-      <p class="hint">
-        Extra formats, whole-library export and scheduled backups. One payment, no subscription.
-      </p>
+    <!-- ---------------------------------------------------------------- -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Licence</span>
+        <span id="proBadge" class="chip">LOCKED</span>
+      </div>
 
-      <div class="inline">
-        <label class="field" for="licenseKey">
-          <span>Licence key</span>
-          <input type="text" id="licenseKey" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" autocomplete="off" spellcheck="false">
+      <div id="licenseEntry" class="split">
+        <label style="flex:1">
+          <input type="text" id="licenseKey" class="input"
+                 placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                 autocomplete="off" spellcheck="false" aria-label="Licence key">
         </label>
-        <button id="activateBtn" class="primary">Activate</button>
+        <button id="activateBtn" class="btn btn-primary" style="flex:0 0 auto">Activate</button>
       </div>
-      <div class="actions">
-        <button id="buyBtn">Get a licence</button>
-        <button id="deactivateBtn" hidden>Remove from this browser</button>
+
+      <div id="licenseActive" class="licence-active" hidden>
+        <div class="who">
+          <span class="chip chip-round chip-ok">Active</span>
+          <span id="licenseMasked" class="licence-key"></span>
+        </div>
+        <button id="deactivateBtn" class="btn btn-destructive">Remove</button>
       </div>
-      <div id="licenseNotice" class="notice"></div>
-    </section>
 
-    <section>
-      <h2>Export defaults</h2>
-      <p class="hint">Used by the popup and by scheduled backups.</p>
+      <p class="hint" id="licenseBlurb">
+        Pro unlocks PDF, Word, Obsidian, CSV and JSONL, whole-library export and scheduled
+        backups. One payment, no subscription.
+      </p>
+      <div class="split">
+        <button id="buyBtn" class="btn btn-quiet">Get a licence</button>
+      </div>
 
-      <label class="field" for="defaultFormat">
-        <span>Default format</span>
-        <select id="defaultFormat"></select>
-      </label>
-    </section>
+      <div id="licenseNotice" class="notice" hidden>
+        <span class="notice-label"></span>
+        <span class="notice-body"></span>
+      </div>
+    </div>
 
-    <section>
-      <h2>What to include</h2>
+    <!-- ---------------------------------------------------------------- -->
+    <div class="group">
+      <span class="eyebrow">Defaults</span>
+      <div class="row">
+        <div class="what">
+          <strong>Export format</strong>
+          <span>Also set by the popup's picker, and used by scheduled backups.</span>
+        </div>
+        <span class="select">
+          <select id="defaultFormat" aria-label="Default export format"></select>
+          <svg><use href="#i-caret"></use></svg>
+        </span>
+      </div>
+    </div>
+
+    <!-- ---------------------------------------------------------------- -->
+    <div class="group">
+      <span class="eyebrow">What to include</span>
       <p class="hint">
-        The API exposes far more than the page shows. Turn off anything you would
-        rather keep out of your exports.
+        The API exposes far more than the page shows. Turn off anything you would rather
+        keep out of your exports.
       </p>
 
       <div class="row">
-        <input type="checkbox" id="scrapeReasoning">
-        <label for="scrapeReasoning">Model reasoning
-          <small>Thinking shown before the answer, kept as its own message.</small></label>
+        <div class="what">
+          <strong>Model reasoning</strong>
+          <span>Thinking shown before the answer, kept as its own message.</span>
+        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="scrapeReasoning" class="switch-input">
+          <span class="switch"></span>
+        </label>
       </div>
-      <div class="row">
-        <input type="checkbox" id="includeModelConfig">
-        <label for="includeModelConfig">Model settings
-          <small>Model name, temperature, top-P, top-K and output limit.</small></label>
-      </div>
-      <div class="row">
-        <input type="checkbox" id="includeSystemInstruction">
-        <label for="includeSystemInstruction">System instruction</label>
-      </div>
-      <div class="row">
-        <input type="checkbox" id="includeTimestamps">
-        <label for="includeTimestamps">Timestamps</label>
-      </div>
-      <div class="row">
-        <input type="checkbox" id="includeTokenCounts">
-        <label for="includeTokenCounts">Token counts</label>
-      </div>
-      <div class="row">
-        <input type="checkbox" id="includeSourceUrl">
-        <label for="includeSourceUrl">Link back to the conversation</label>
-      </div>
-    </section>
-
-    <section>
-      <h2>Attachments</h2>
-      <p class="hint">Files are fetched from Drive, so exports contain the real thing rather than a thumbnail.</p>
+      <div class="rule"></div>
 
       <div class="row">
-        <input type="checkbox" id="condenseAttachments">
-        <label for="condenseAttachments">Keep attachments with their message
-          <small>AI Studio stores each attached file as its own message. On by default,
-            so a message with three images stays one message instead of four.</small></label>
-      </div>
-      <div class="row">
-        <input type="checkbox" id="scrapeImages">
-        <label for="scrapeImages">Images</label>
-      </div>
-      <div class="row">
-        <input type="checkbox" id="scrapeAttachments">
-        <label for="scrapeAttachments">Files and documents</label>
-      </div>
-      <div id="attachmentOptions" class="sub-options">
-        <div class="row">
-          <input type="checkbox" id="scrapeAttachmentTitle">
-          <label for="scrapeAttachmentTitle">File names</label>
+        <div class="what">
+          <strong>Model settings</strong>
+          <span>Model name, temperature, top-P, top-K and output limit.</span>
         </div>
-        <div class="row">
-          <input type="checkbox" id="scrapeAttachmentSize">
-          <label for="scrapeAttachmentSize">File sizes</label>
-        </div>
-        <div class="row">
-          <input type="checkbox" id="scrapeAttachmentPreview">
-          <label for="scrapeAttachmentPreview">Thumbnails
-            <small>Only used when the page is scraped as a fallback.</small></label>
-        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeModelConfig" class="switch-input">
+          <span class="switch"></span>
+        </label>
       </div>
-    </section>
+      <div class="rule"></div>
 
-    <section>
-      <h2>Fine-tuning dataset <span class="badge">PRO</span></h2>
+      <div class="row">
+        <div class="what"><strong>System instruction</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeSystemInstruction" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Timestamps</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeTimestamps" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Token counts</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeTokenCounts" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Link back to the conversation</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeSourceUrl" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- ---------------------------------------------------------------- -->
+    <div class="group">
+      <span class="eyebrow">Attachments</span>
+      <p class="hint">
+        Files are fetched from Drive, so exports contain the real thing rather than a
+        thumbnail.
+      </p>
+
+      <div class="row">
+        <div class="what">
+          <strong>Keep attachments with their message</strong>
+          <span>AI Studio stores each attached file as its own message. On by default, so a
+            message with three images stays one message instead of four.</span>
+        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="condenseAttachments" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Images</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="scrapeImages" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Files and documents</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="scrapeAttachments" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+
+      <div id="attachmentOptions" class="sub">
+        <div class="row">
+          <div class="what"><strong>File names</strong></div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="scrapeAttachmentTitle" class="switch-input">
+            <span class="switch"></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="what"><strong>File sizes</strong></div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="scrapeAttachmentSize" class="switch-input">
+            <span class="switch"></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="what">
+            <strong>Thumbnails</strong>
+            <span>Only used when the page is scraped as a fallback.</span>
+          </div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="scrapeAttachmentPreview" class="switch-input">
+            <span class="switch"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------------------------------------------------------------- -->
+    <div class="group">
+      <div class="panel-head">
+        <span class="eyebrow">Fine-tuning dataset</span>
+        <span class="chip">PRO</span>
+      </div>
       <p class="hint">
         Applies to the JSONL export only.
         <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/formats.md#jsonl"
@@ -242,71 +297,120 @@
       </p>
 
       <div class="row">
-        <input type="checkbox" id="jsonlIncludeReasoning">
-        <label for="jsonlIncludeReasoning">Include reasoning in the dataset
-          <small>Off by default: training on a model's private thinking as if it were the
-            reply teaches it to emit thinking as output.</small></label>
+        <div class="what">
+          <strong>Include reasoning in the dataset</strong>
+          <span>Off by default: training on a model's private thinking as if it were the
+            reply teaches it to emit thinking as output.</span>
+        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="jsonlIncludeReasoning" class="switch-input">
+          <span class="switch"></span>
+        </label>
       </div>
-    </section>
+    </div>
 
-    <section>
-      <h2>Scheduled backup <span class="badge">PRO</span></h2>
-      <p class="hint">
-        Backs up only what changed since last time, so a routine run is quick.
-        Chrome must be running when one is due.
-      </p>
+    <!-- ---------------------------------------------------------------- -->
+    <div class="panel" id="backupPanel">
+      <div class="panel-head">
+        <span class="eyebrow">Scheduled backup</span>
+        <span id="backupProBadge" class="chip">PRO</span>
+      </div>
 
       <div id="backupControls">
         <div class="row">
-          <input type="checkbox" id="backupEnabled">
-          <label for="backupEnabled">Back up my library automatically</label>
+          <div class="what">
+            <strong>Back up my library automatically</strong>
+            <span>Runs in a background tab, with no overlay. Watch the toolbar badge.
+              Only what changed since last time is fetched, and Chrome must be running
+              when one is due.</span>
+          </div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="backupEnabled" class="switch-input">
+            <span class="switch"></span>
+          </label>
         </div>
 
-        <div class="inline">
-          <label class="field" for="backupFrequency">
-            <span>How often</span>
-            <select id="backupFrequency">
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
+        <div class="split" style="margin-top:14px">
+          <label>
+            <span class="field-label">Frequency</span>
+            <span class="select">
+              <select id="backupFrequency">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+              <svg><use href="#i-caret"></use></svg>
+            </span>
           </label>
-          <label class="field" for="backupFormat">
-            <span>Format</span>
-            <select id="backupFormat"></select>
+          <label>
+            <span class="field-label">Format</span>
+            <span class="select">
+              <select id="backupFormat"></select>
+              <svg><use href="#i-caret"></use></svg>
+            </span>
           </label>
-          <button id="runBackupBtn">Run now</button>
+          <label style="flex:0 0 auto; justify-content:flex-end">
+            <button id="runBackupBtn" class="btn btn-quiet">Run now</button>
+          </label>
         </div>
       </div>
-      <div id="backupNotice" class="notice"></div>
-    </section>
 
-    <section>
-      <h2>Advanced</h2>
-      <p class="hint">
-        Only used when the API is unavailable and the page has to be scraped instead.
-      </p>
-      <label class="field" for="loadDelay">
-        <span>Page load delay (ms)</span>
-        <input type="number" id="loadDelay" min="200" max="5000" step="50">
-      </label>
-    </section>
-
-    <div class="actions">
-      <button id="saveBtn" class="primary">Save settings</button>
-      <button id="resetBtn">Reset to defaults</button>
+      <div id="backupNotice" class="notice" hidden>
+        <span class="notice-label"></span>
+        <span class="notice-body"></span>
+      </div>
     </div>
 
-    <footer>
-      v<span id="version"></span> &middot;
-      <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/README.md" target="_blank" rel="noopener noreferrer">What each format contains</a> &middot;
-      <a href="https://github.com/Sukarth/AI-studio-exporter" target="_blank" rel="noopener noreferrer">Open source on GitHub</a>
-    </footer>
+    <!-- ---------------------------------------------------------------- -->
+    <div class="group">
+      <span class="eyebrow">Advanced</span>
+      <p class="hint">Only used when the API is unavailable and the page has to be scraped instead.</p>
+      <div class="row">
+        <div class="what">
+          <strong>Page load delay</strong>
+          <span>Milliseconds to wait for each message to render before reading it.</span>
+        </div>
+        <input type="number" id="loadDelay" class="input" min="200" max="5000" step="50"
+               aria-label="Page load delay in milliseconds">
+      </div>
+    </div>
+
+    <div class="split">
+      <button id="saveBtn" class="btn btn-primary">Save settings</button>
+    </div>
+
+    <div class="page-foot">
+      <button id="resetBtn" class="btn btn-destructive">Reset to defaults</button>
+      <span class="links">
+        <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/README.md"
+           target="_blank" rel="noopener noreferrer">
+          <svg><use href="#i-book"></use></svg>Format docs
+        </a>
+        <a href="https://github.com/Sukarth/AI-studio-exporter" target="_blank" rel="noopener noreferrer">
+          <svg><use href="#i-code"></use></svg>GitHub
+        </a>
+      </span>
+    </div>
   </main>
 
-  <div id="toast" class="toast"></div>
+  <div id="resetScrim" class="scrim" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+      <h2 id="resetTitle">Reset all settings?</h2>
+      <p>Format, attachments, the fine-tuning options and the backup schedule go back to
+        defaults. Your licence key is kept.</p>
+      <div class="modal-actions">
+        <button id="resetCancel" class="btn btn-quiet">Cancel</button>
+        <button id="resetConfirm" class="btn btn-danger">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">
+    <svg><use href="#i-check"></use></svg><span id="toastText"></span>
+  </div>
 
   <script src="settings.js"></script>
+  <script src="src/badge.js"></script>
   <script src="pro/license.js"></script>
   <script src="options.js"></script>
 </body>

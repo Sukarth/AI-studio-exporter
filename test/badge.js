@@ -140,7 +140,7 @@ async function main() {
       await badge.set(state);
       assert.ok(last().text, `${state} has no glyph`);
       assert.match(last().color, /^#[0-9A-F]{6}$/, `${state} has no colour`);
-      assert.strictEqual(last().textColor, '#FFFFFF');
+      assert.match(last().textColor, /^#[0-9A-F]{6}$/, `${state} has no ink`);
       assert.ok(last().title.length > 10, `${state} has no tooltip`);
     }
   });
@@ -187,6 +187,19 @@ async function main() {
     painted = [];
     await badge.restore();
     assert.strictEqual(last().text, '', 'a seen failure must not come back');
+  });
+
+  await test('a downgrade is recorded as its own kind', async () => {
+    await badge.set('failed', 'Exported as Markdown instead.', 'downgrade');
+    const status = await badge.read();
+    assert.strictEqual(status.state, 'failed', 'the badge is still red');
+    assert.strictEqual(status.kind, 'downgrade', 'but the popup can tell it apart');
+    assert.strictEqual(last().text, 'X');
+  });
+
+  await test('an ordinary failure has no kind', async () => {
+    await badge.set('failed', 'boom');
+    assert.strictEqual((await badge.read()).kind, null);
   });
 
   await test('the popup still reads the message back after acknowledging it', async () => {

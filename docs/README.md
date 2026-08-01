@@ -1,4 +1,4 @@
-# AI Studio Exporter — format documentation
+# AI Studio Exporter: format documentation
 
 What each export format contains, what every field means, and how the settings
 change the output.
@@ -34,7 +34,7 @@ explain most of what looks odd in an export:
 
 **A conversation is a flat list of turns, not a tree.** Each turn has a `role`
 (`user` or `model`) and an `isThought` flag. Reasoning is a `model` turn with
-`isThought: true` — it is not nested inside the answer it precedes, because AI
+`isThought: true`; it is not nested inside the answer it precedes, because AI
 Studio does not store it that way.
 
 **Attachments arrive as their own turns.** AI Studio files each uploaded image
@@ -61,5 +61,5 @@ they were sent with. See [settings guide](settings.md#condense-attachments).
 | --- | --- |
 | Non-Latin text is `?` in the PDF | The standard PDF fonts are Latin-only. Export HTML and print to PDF from your browser. |
 | A message shows a file name but no file | The bytes could not be fetched. The name is kept so the record stays honest. |
-| A message has no text, only attachments | AI Studio stored it that way and `condenseAttachments` had nothing to fold it into — usually the last message in a conversation. |
+| A message has no text, only attachments | AI Studio stored it that way and `condenseAttachments` had nothing to fold it into (usually the last message in a conversation). |
 | Fields are missing everywhere | Either a setting is off ([settings guide](settings.md)) or the export came from the DOM fallback, which cannot see metadata. Check `source` in the JSON. |

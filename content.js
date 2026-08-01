@@ -5,8 +5,8 @@
  *   1. The progress overlay and the message channel to the popup.
  *   2. A DOM-scraping extractor, used only when the API path fails.
  *
- * Scraping is the fallback, not the primary route. It is slow — every turn has
- * to be scrolled into view and given time to render — and it can only see what
+ * Scraping is the fallback, not the primary route. It is slow: every turn has
+ * to be scrolled into view and given time to render, and it can only see what
  * the page draws, so model settings, token counts and timestamps are lost. It
  * exists because the API it replaces is undocumented and could change without
  * notice, and a degraded export beats no export.
@@ -29,69 +29,157 @@
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // --- progress state -----------------------------------------------------
+
+  /**
+   * What the export is doing right now.
+   *
+   * Two things read this: the injected overlay, and the popup, which polls for
+   * it so that reopening mid-export shows live progress rather than the word
+   * "exporting". Keeping one record means they can never disagree.
+   *
+   * `tone` is 'accent' normally, 'warn' once the API path has been abandoned,
+   * and 'muted' while a cancellation is settling.
+   */
+  let progress = null;
+
+  const emptyProgress = () => ({
+    stage: 'Starting',
+    detail: '',
+    done: 0,
+    total: 0,
+    tone: 'accent',
+    note: null,
+    failed: 0,
+  });
+
+  // Counts arrive inside the stage text ("Downloading attachments… (3/7)") or
+  // as a detail of their own ("128 / 312"). Reading both means no call site
+  // has to change to feed the progress bar.
+  const COUNT = /(\d+)\s*\/\s*(\d+)/;
+
+  function setProgress(message, detail) {
+    if (!progress) progress = emptyProgress();
+
+    const source = COUNT.exec(detail || '') || COUNT.exec(message || '');
+    if (source) {
+      progress.done = Number(source[1]);
+      progress.total = Number(source[2]);
+    }
+
+    if (message) {
+      // The count belongs on the mono line, not in the sentence.
+      progress.stage = message.replace(/\s*\(?\d+\s*\/\s*\d+\)?/, '').replace(/[…:]\s*$/, '').trim();
+      const failures = /\((\d+) failed\)/.exec(message);
+      progress.failed = failures ? Number(failures[1]) : progress.failed;
+      progress.stage = progress.stage.replace(/\s*\(\d+ failed\)/, '').trim();
+    }
+    if (detail && !source) progress.detail = detail;
+    else if (source) progress.detail = detail && !COUNT.test(detail) ? detail : '';
+
+    paintOverlay();
+  }
+
   // --- progress overlay ---------------------------------------------------
 
-  function showLoadingOverlay(heading) {
-    if (document.getElementById('ai-studio-export-overlay')) return;
+  // Tokens duplicated from theme.css by necessity: this markup is injected
+  // into a page we do not control, so it cannot link a stylesheet of ours.
+  const OVERLAY_CSS = `
+    @keyframes aise-spin { to { transform: rotate(360deg); } }
+    @keyframes aise-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(333%); } }
+    #aise-overlay {
+      position: fixed; inset: 0; z-index: 2147483000;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(8,9,11,.72); backdrop-filter: blur(8px);
+      font-family: Manrope, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #aise-overlay .aise-card {
+      width: 340px; padding: 26px; text-align: center;
+      background: #16181c; border: 1px solid #262931; border-radius: 16px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.5); color: #e7e8ea;
+    }
+    #aise-overlay .aise-spin {
+      width: 36px; height: 36px; margin: 0 auto 16px; border-radius: 50%;
+      border: 3px solid rgba(79,157,250,.2); border-top-color: #4f9dfa;
+      animation: aise-spin 1s linear infinite;
+    }
+    #aise-overlay.is-warn .aise-spin { border-color: rgba(217,163,74,.2); border-top-color: #d9a34a; }
+    #aise-overlay.is-muted .aise-spin { border-color: rgba(143,148,156,.2); border-top-color: #8f949c; }
+    #aise-overlay .aise-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; letter-spacing: -.01em; }
+    #aise-overlay .aise-stage {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: 13px; color: #8f949c; min-height: 20px;
+    }
+    #aise-overlay.is-warn .aise-stage { color: #e0be86; }
+    #aise-overlay .aise-failed {
+      font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+      background: rgba(232,115,107,.16); color: #f0a49e;
+    }
+    #aise-overlay .aise-bar {
+      height: 4px; border-radius: 999px; background: #26282f;
+      margin: 16px 0 10px; overflow: hidden;
+    }
+    #aise-overlay .aise-bar > i { display: block; height: 100%; background: #4f9dfa; transition: width .25s ease; }
+    #aise-overlay.is-warn .aise-bar > i { background: #d9a34a; }
+    #aise-overlay.is-muted .aise-bar > i { background: #4b4f57; }
+    #aise-overlay .aise-bar.is-sweep > i {
+      width: 30%; background: rgba(79,157,250,.55); animation: aise-sweep 1.4s ease-in-out infinite;
+    }
+    #aise-overlay .aise-count {
+      font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+      font-size: 11.5px; color: #6f757d; margin-bottom: 16px; min-height: 17px;
+    }
+    #aise-overlay.is-accent .aise-count { color: #9cc9fd; }
+    #aise-overlay.is-warn .aise-count { color: #e0be86; }
+    #aise-overlay .aise-note {
+      margin: 14px 0 12px; padding: 9px 11px; border-radius: 9px; text-align: left;
+      background: rgba(217,163,74,.1); font-size: 11.5px; line-height: 1.45; color: #cbbfa6;
+    }
+    #aise-overlay .aise-cancel {
+      padding: 9px 18px; border-radius: 8px; font-family: inherit;
+      font-size: 12.5px; font-weight: 600; cursor: pointer;
+      background: rgba(232,115,107,.1); border: 1px solid rgba(232,115,107,.3); color: #e8736b;
+    }
+    #aise-overlay .aise-cancel:hover { background: rgba(232,115,107,.18); }
+    #aise-overlay .aise-cancel:disabled {
+      background: transparent; border-color: #2b2e36; color: #5c6169; cursor: not-allowed;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #aise-overlay .aise-spin, #aise-overlay .aise-bar > i { animation: none; }
+    }
+  `;
 
-    if (!document.getElementById('ai-studio-export-style')) {
+  function showLoadingOverlay(heading) {
+    if (document.getElementById('aise-overlay')) return;
+
+    if (!document.getElementById('aise-overlay-style')) {
       const style = document.createElement('style');
-      style.id = 'ai-studio-export-style';
-      style.textContent = `
-        @keyframes aise-spin { to { transform: rotate(360deg); } }
-        #ai-studio-export-overlay {
-          position: fixed; inset: 0; z-index: 999999;
-          display: flex; align-items: center; justify-content: center;
-          background: rgba(0,0,0,.65); backdrop-filter: blur(8px);
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        #ai-studio-export-overlay .aise-card {
-          background:#25262b; color:#e9ecef; border:1px solid #2c2e33;
-          border-radius:16px; padding:40px; width:90%; max-width:400px;
-          text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.4);
-        }
-        #ai-studio-export-overlay .aise-spinner {
-          width:50px; height:50px; margin:0 auto 24px; border-radius:50%;
-          border:3px solid rgba(102,126,234,.2); border-top-color:#667eea;
-          animation: aise-spin 1s linear infinite;
-        }
-        #ai-studio-export-overlay h2 { margin:0 0 12px; font-size:20px; font-weight:600; color:#fff; }
-        #ai-studio-export-status { margin:0; font-size:14px; line-height:1.6; color:#a5a5a5; }
-        #ai-studio-export-progress {
-          margin:24px 0 20px; padding-top:24px; border-top:1px solid #2c2e33;
-          color:#667eea; font-size:13px; font-weight:600;
-          /* Reserve the line whether or not a stage supplies a detail, so the
-             card does not grow and shrink as stages come and go. */
-          line-height:16px; min-height:16px;
-        }
-        #ai-studio-export-cancel {
-          background:transparent; border:1px solid #c92a2a; color:#ff8787;
-          padding:8px 16px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;
-        }
-        #ai-studio-export-cancel:hover { background:rgba(201,42,42,.1); }
-        #ai-studio-export-cancel:disabled { opacity:.7; cursor:not-allowed; }
-      `;
+      style.id = 'aise-overlay-style';
+      style.textContent = OVERLAY_CSS;
       document.head.appendChild(style);
     }
 
-    const title = heading || 'Exporting Conversation';
+    const title = heading || 'Exporting conversation';
     const overlay = document.createElement('div');
-    overlay.id = 'ai-studio-export-overlay';
-    // Built as nodes rather than innerHTML because the heading is now a
+    overlay.id = 'aise-overlay';
+    overlay.className = 'is-accent';
+
+    // Built as nodes rather than one innerHTML string: the heading is a
     // parameter, and a template that interpolates one is a template someone
-    // will eventually pass user text to.
+    // eventually passes user text to.
     const card = document.createElement('div');
     card.className = 'aise-card';
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-live', 'polite');
     card.setAttribute('aria-label', title);
-    card.innerHTML = `
-        <div class="aise-spinner"></div>
-        <h2></h2>
-        <p id="ai-studio-export-status">Starting…</p>
-        <div id="ai-studio-export-progress"></div>
-        <button id="ai-studio-export-cancel" type="button">Cancel Export</button>`;
-    card.querySelector('h2').textContent = `${title}…`;
+    card.innerHTML =
+      '<div class="aise-spin"></div>' +
+      '<div class="aise-title"></div>' +
+      '<div class="aise-stage"><span class="aise-stage-text"></span></div>' +
+      '<div class="aise-bar is-sweep"><i></i></div>' +
+      '<div class="aise-count">&nbsp;</div>' +
+      '<button class="aise-cancel" type="button">Cancel export</button>';
+    card.querySelector('.aise-title').textContent = `${title}…`;
     overlay.appendChild(card);
 
     // Swallow interaction so a stray click can't disturb the page mid-export.
@@ -100,25 +188,75 @@
     }
     overlay.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
 
-    overlay.querySelector('#ai-studio-export-cancel').addEventListener('click', (event) => {
+    card.querySelector('.aise-cancel').addEventListener('click', (event) => {
       shouldCancel = true;
+      if (progress) progress.tone = 'muted';
       const button = event.currentTarget;
       button.textContent = 'Cancelling…';
       button.disabled = true;
+      paintOverlay();
     });
 
     document.body.appendChild(overlay);
+    paintOverlay();
   }
 
-  function updateLoadingStatus(message, progress) {
-    const status = document.getElementById('ai-studio-export-status');
-    const detail = document.getElementById('ai-studio-export-progress');
-    if (status && message) status.textContent = message;
-    if (detail) detail.textContent = progress || '';
+  /**
+   * Draw the current progress into the overlay.
+   *
+   * Every element is always present and every one has a reserved height, so
+   * the card is the same size at every stage. The previous version grew and
+   * shrank as stages came and went.
+   */
+  function paintOverlay() {
+    const overlay = document.getElementById('aise-overlay');
+    if (!overlay || !progress) return;
+
+    overlay.className = `is-${progress.tone}`;
+
+    const stage = overlay.querySelector('.aise-stage');
+    stage.querySelector('.aise-stage-text').textContent = progress.stage || '';
+
+    let chip = stage.querySelector('.aise-failed');
+    if (progress.failed) {
+      if (!chip) {
+        chip = document.createElement('span');
+        chip.className = 'aise-failed';
+        stage.appendChild(chip);
+      }
+      chip.textContent = `${progress.failed} failed`;
+    } else if (chip) {
+      chip.remove();
+    }
+
+    const bar = overlay.querySelector('.aise-bar');
+    const fill = bar.firstElementChild;
+    if (progress.total) {
+      bar.className = 'aise-bar';
+      fill.style.width = `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%`;
+    } else {
+      bar.className = 'aise-bar is-sweep';
+      fill.style.width = '';
+    }
+
+    const parts = [];
+    if (progress.total) parts.push(`${progress.done} / ${progress.total}`);
+    if (progress.detail) parts.push(progress.detail);
+    const count = overlay.querySelector('.aise-count');
+    count.textContent = parts.join(' · ');
+    if (!parts.length) count.innerHTML = '&nbsp;';
+
+    let note = overlay.querySelector('.aise-note');
+    if (progress.note && !note) {
+      note = document.createElement('div');
+      note.className = 'aise-note';
+      overlay.querySelector('.aise-card').insertBefore(note, overlay.querySelector('.aise-cancel'));
+    }
+    if (note) note.textContent = progress.note || '';
   }
 
   function hideLoadingOverlay() {
-    const overlay = document.getElementById('ai-studio-export-overlay');
+    const overlay = document.getElementById('aise-overlay');
     if (!overlay) return;
     overlay.style.transition = 'opacity .3s ease';
     overlay.style.opacity = '0';
@@ -133,7 +271,7 @@
   /**
    * The toggle's own label states which way it will switch, so reading it is
    * both cheaper and more reliable than the previous approach of serialising
-   * document.body.innerHTML — an operation that grew with conversation length
+   * document.body.innerHTML, an operation that grew with conversation length
    * and ran on every check.
    */
   function isRawModeEnabled() {
@@ -206,7 +344,7 @@
   /**
    * Attachments render as a chip with a title and a size, and sometimes a
    * thumbnail. The page never holds the underlying file, so scraping can only
-   * ever recover the label — the API path is what retrieves real bytes.
+   * ever recover the label; the API path is what retrieves real bytes.
    */
   async function readAttachmentChunks(turnEl, settings, counter) {
     const parts = [];
@@ -256,7 +394,7 @@
    *
    * Returns an array because a single model turn can yield two: its reasoning
    * and its answer. The previous implementation returned early on finding a
-   * reasoning block, so the answer was discarded — likewise a user message with
+   * reasoning block, so the answer was discarded; likewise a user message with
    * both an image and a caption lost the caption. Every piece of content on the
    * turn is now collected instead of the first match winning.
    */
@@ -391,18 +529,21 @@
    * service worker does it; failures are ignored because a badge that could
    * not be painted must never take an export down with it.
    */
-  const setBadge = (state, text) => {
+  const setBadge = (state, text, kind) => {
     try {
-      chrome.runtime.sendMessage({ action: 'status:set', state, text }, () => chrome.runtime.lastError);
+      chrome.runtime.sendMessage(
+        { action: 'status:set', state, text, kind },
+        () => chrome.runtime.lastError
+      );
     } catch (_) {
-      // Extension context invalidated — the export is about to fail anyway.
+      // Extension context invalidated; the export is about to fail anyway.
     }
   };
 
   /**
    * Shared wrapper for both export kinds: one at a time, overlay up, overlay
    * always torn down. `silent` suppresses the overlay for scheduled backups,
-   * which run in a background tab the user is not looking at — the badge is
+   * which run in a background tab the user is not looking at; the badge is
    * deliberately not suppressed, because it is the only way an unattended
    * backup can report that it failed.
    */
@@ -412,7 +553,8 @@
     const library = request.action === 'exportLibrary';
     isExporting = true;
     shouldCancel = false;
-    if (!request.silent) showLoadingOverlay(library ? 'Exporting Library' : 'Exporting Conversation');
+    progress = emptyProgress();
+    if (!request.silent) showLoadingOverlay(library ? 'Exporting library' : 'Exporting conversation');
     setBadge('running');
 
     let downgraded = false;
@@ -424,22 +566,36 @@
       const resolved = await AISE.license.resolveFormat(requested);
       const { format, reason } = resolved;
       downgraded = resolved.downgraded;
-      if (downgraded && !request.silent) updateLoadingStatus(reason);
+      // A note rather than a status message: it used to be written over the
+      // status line and then overwritten a moment later by the first real
+      // stage, so the one thing worth reading was the one thing that flashed.
+      if (downgraded) {
+        progress.note = reason;
+        paintOverlay();
+      }
 
       const result = await work({
         settings,
         formatId: format.id,
-        report: request.silent ? () => {} : (message, progress) => updateLoadingStatus(message, progress),
+        report: setProgress,
         shouldCancel: () => shouldCancel,
-        // Fires the moment the API path is abandoned, so the badge can say so
-        // while the slow part is still running rather than only afterwards.
-        onSource: (source) => setBadge(source === 'dom' ? 'reading' : 'running'),
+        // Fires the moment the API path is abandoned, so the badge and the
+        // overlay can say so while the slow part is still running.
+        onSource: (source) => {
+          if (source === 'dom' && progress && progress.tone !== 'muted') progress.tone = 'warn';
+          paintOverlay();
+          setBadge(source === 'dom' ? 'reading' : 'running');
+        },
       });
 
       if (downgraded && result && result.success) {
         result.message = `${result.message} · ${reason}`;
       }
-      setBadge(AISE.badge.outcomeFor(result, downgraded), result && result.message);
+      setBadge(
+        AISE.badge.outcomeFor(result, downgraded),
+        result && result.message,
+        downgraded ? 'downgrade' : null
+      );
       return result;
     } catch (error) {
       console.error('[AI Studio Exporter] Export failed:', error);
@@ -449,6 +605,7 @@
     } finally {
       isExporting = false;
       shouldCancel = false;
+      progress = null;
       hideLoadingOverlay();
     }
   }
@@ -502,7 +659,9 @@
       return true;
     }
     if (request.action === 'getStatus') {
-      sendResponse({ isExporting });
+      // The popup polls this while it is open, so it can show live progress
+      // rather than the word "exporting".
+      sendResponse({ isExporting, progress: progress ? Object.assign({}, progress) : null });
       return false;
     }
 
@@ -513,7 +672,7 @@
 
   // Injection marker. The isolated world is invisible from the page and from
   // devtools automation, so without this there is no way to tell "extension not
-  // loaded" apart from "extension loaded but broken" — which is the first thing
+  // loaded" apart from "extension loaded but broken"; which is the first thing
   // worth knowing in any bug report.
   document.documentElement.dataset.aiStudioExporter =
     (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || 'unknown';

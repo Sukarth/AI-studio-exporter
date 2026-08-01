@@ -43,7 +43,7 @@ No install step is needed to run or hack on the extension:
    AI Studio tab so content scripts re-inject.
 
 To confirm the content script is live on a page, check for the
-`data-ai-studio-exporter` attribute on `<html>` — it holds the extension version.
+`data-ai-studio-exporter` attribute on `<html>`; it holds the extension version.
 
 ### Tests
 
@@ -61,14 +61,14 @@ so the suite works on a fresh clone. `test/documents.js` needs the bundle descri
 below and skips itself when it is absent.
 
 `test/run.js` holds the unit tests and a handful of static checks on the repo
-itself — no literal control characters in source, every id the extension pages
+itself. These check for literal control characters in source, every id the extension pages
 reach for exists in their markup, every fetched origin has a host permission.
 `test/batch.js` drives whole-library export end to end with only the API and
 the download faked, including volume splitting: production starts a new archive
 at 256 MB, and the threshold is read through `AISE.batch.VOLUME_BYTES` so the
 splitting logic can be exercised at a few kilobytes rather than by generating a
 quarter of a gigabyte of conversations. `test/license.js` fakes storage and the network to cover
-the cases that decide whether a paying user keeps access — Polar unreachable, a
+the cases that decide whether a paying user keeps access: Polar unreachable, a
 revoked key, an activation slot being released. `test/attachments.js` fakes
 Drive and counts requests, because most of what matters there is about requests
 that should *not* happen. `test/badge.js` freezes `Date.now` so the toolbar
@@ -91,21 +91,21 @@ page that throws on load, an alarm that is not actually created.
 
 `test/ui-export.js` runs a whole export without a Google account. Playwright
 fulfils requests to `https://aistudio.google.com/**` itself, so the page carries
-that real origin — which is what decides whether Chrome injects the content
-scripts — while the body is ours. The MakerSuite RPC and Drive are answered with
+that real origin (which is what decides whether Chrome injects the content
+scripts), while the body is ours. The MakerSuite RPC and Drive are answered with
 canned wire-format fixtures, and the downloaded archive is read back off disk
 and checked byte for byte. It also reads the toolbar badge back out of
 `chrome.action`, which is the only way to know Chrome painted what the code
 asked for. Catching the progress overlay mid-export needs the network to be
-slow, so the RPC mock honours a one-shot `seen.stallMs` delay — without it the
+slow, so the RPC mock honours a one-shot `seen.stallMs` delay. Without it the
 overlay exists for a couple of frames.
 
 `test/ui-alarm.js` covers scheduled backups the only way that proves anything:
 it registers a real `chrome.alarms` alarm and waits for Chrome to fire it,
 rather than calling `runBackup()`. If the alarm never fires, or the service
 worker is not around to hear it, no download appears and the test fails. Chrome
-honours a sub-minute delay for an unpacked extension — the archive lands about
-a second after the alarm is armed — and clamps to a minute otherwise, which the
+honours a sub-minute delay for an unpacked extension; the archive lands about
+a second after the alarm is armed and clamps to a minute otherwise, which the
 timeout accommodates. The scheduling contract, that a daily backup arms a
 1440-minute alarm, is asserted against the alarm `configure()` really creates.
 
@@ -117,7 +117,7 @@ Two constraints worth knowing before you edit them:
   in a single process intermittently fail to load the extension at all, which
   is why the two browser suites are separate files rather than one.
 
-Polar is intercepted, never called — activations are seat-limited and a test run
+Polar is intercepted, never called; activations are seat-limited and a test run
 must not spend one.
 
 ### Building
@@ -132,7 +132,7 @@ npm run build        # or: npm run build:watch
 
 This bundles `pro/formats/documents.src.js` into
 `vendor/pro-documents.bundle.js` with esbuild. **That output is committed**, so
-you only need to run it if you change that one file — and you should commit the
+you only need to run it if you change that one file; you should commit the
 rebuilt bundle alongside your change.
 
 The build fails if the bundle contains `eval`, `new Function` or

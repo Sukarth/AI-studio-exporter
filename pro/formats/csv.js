@@ -1,5 +1,5 @@
 /**
- * CSV export — one row per turn, for analysis in a spreadsheet.
+ * CSV export: one row per turn, for analysis in a spreadsheet.
  *
  * @license MIT
  */
@@ -54,7 +54,7 @@
   AISE.formats = AISE.formats || {};
   AISE.formats.csv = {
     id: 'csv',
-    label: 'CSV — one row per message (.csv)',
+    label: 'CSV: one row per message (.csv)',
     extension: 'csv',
     mimeType: 'text/csv',
     pro: true,

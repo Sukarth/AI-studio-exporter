@@ -1,5 +1,5 @@
 /**
- * Test runner. No framework — the extension ships no build step and no
+ * Test runner. No framework; the extension ships no build step and no
  * node_modules, and keeping it that way means a contributor can clone and run
  * `npm test` with nothing installed.
  *
@@ -49,7 +49,7 @@ const { AISE } = globalThis;
 
 /**
  * settings.js is a plain script whose top-level `const` declarations become
- * global *lexical* bindings under eval — reachable by name from inside the same
+ * global *lexical* bindings under eval; reachable by name from inside the same
  * script, but never as properties of globalThis. Appending an export statement
  * to the source is the only way to get at them from here.
  */
@@ -534,11 +534,14 @@ test('every element the popup and options pages reach for exists in their HTML',
 
     const wanted = new Set();
     for (const match of js.matchAll(/getElementById\('([^']+)'\)/g)) wanted.add(match[1]);
-    // options.js goes through a one-letter helper: el('backupFormat').
-    for (const match of js.matchAll(/\bel\('([^']+)'\)/g)) wanted.add(match[1]);
+    // Both pages go through a one-letter helper as well: el('backupFormat'),
+    // $('formatList'). Without these the check quietly stops checking.
+    // `\b` before `$` would never match, since `$` is not a word character.
+    for (const match of js.matchAll(/(?:\bel|\$)\('([^']+)'\)/g)) wanted.add(match[1]);
 
     const missing = [...wanted].filter((id) => !declared.has(id));
     assert.deepStrictEqual(missing, [], `${script} references ids absent from ${markup}`);
+    assert.ok(wanted.size > 5, `${script}: found only ${wanted.size} ids, the pattern has stopped matching`);
   }
 });
 

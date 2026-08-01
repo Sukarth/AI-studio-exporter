@@ -2,8 +2,8 @@
  * Export pipeline: acquire a conversation, render it, package it, download it.
  *
  * Acquisition is API-first with a DOM fallback. The API is undocumented and
- * Google can change it without notice, so any failure — a renumbered field, a
- * revoked session, a shape we don't recognise — drops through to scraping the
+ * Google can change it without notice, so any failure (a renumbered field, a
+ * revoked session, a shape we don't recognise) drops through to scraping the
  * page, which is slower and captures less but has no dependency on internals.
  * `conversation.source` records which path ran so the UI can say so.
  *
@@ -49,7 +49,7 @@
   }
 
   /**
-   * Name the archive after the conversation rather than the clock alone — a
+   * Name the archive after the conversation rather than the clock alone: a
    * folder of ai-studio-export-<timestamp>.zip files is unnavigable.
    */
   function buildBaseName(conversation) {
@@ -168,7 +168,7 @@
         return conversation;
       } catch (error) {
         console.warn('[AI Studio Exporter] API path failed, falling back to page scraping:', error);
-        report('API unavailable — falling back to reading the page…');
+        report('API unavailable: falling back to reading the page…');
       }
     }
 
@@ -197,7 +197,7 @@
 
     AISE.model.applySettings(conversation, settings);
 
-    // Formats can flag content they cannot represent — the PDF fonts, for
+    // Formats can flag content they cannot represent; the PDF fonts, for
     // instance, cannot draw non-Latin scripts. Surface it rather than handing
     // back a file full of question marks with no explanation.
     const warning = typeof format.warn === 'function' ? format.warn(conversation) : null;

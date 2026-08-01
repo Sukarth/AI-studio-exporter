@@ -8,7 +8,7 @@
  */
 
 /**
- * Storefront configuration — the only place either value is written down.
+ * Storefront configuration: the only place either value is written down.
  *
  * Both are public by design. The organisation id names which Polar store to
  * ask about a key; it grants nothing on its own, which is why it can sit in an
@@ -59,7 +59,7 @@ const AI_STUDIO_DEFAULT_SETTINGS = Object.freeze({
  * render a picker without loading every renderer (including the 0.76MB
  * document bundle) into an extension page that will never call them.
  *
- * Keep the ids in sync with pro/formats/ and src/formats/ — the test suite
+ * Keep the ids in sync with pro/formats/ and src/formats/; the test suite
  * asserts they match.
  */
 const AI_STUDIO_FORMATS = Object.freeze([

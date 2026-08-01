@@ -2,65 +2,168 @@
  * Popup controller.
  *
  * Sends work to the content script rather than doing it here: the popup closes
- * the moment it loses focus, which would abort anything running in it.
+ * the moment it loses focus, which would abort anything running in it. That
+ * also means the popup never sees the result of an export it started, so the
+ * two things it does show are read back from elsewhere: live progress polled
+ * from the content script, and the last outcome stored by the badge.
  *
  * @license MIT
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const $ = (id) => document.getElementById(id);
+
   const el = {
-    status: document.getElementById('status'),
-    statusText: document.getElementById('statusText'),
-    statusIcon: document.querySelector('.status-icon'),
-    format: document.getElementById('formatSelect'),
-    exportBtn: document.getElementById('exportBtn'),
-    btnText: document.getElementById('btnText'),
-    libraryBtn: document.getElementById('exportLibraryBtn'),
-    libraryProBadge: document.getElementById('libraryProBadge'),
-    message: document.getElementById('message'),
-    settingsBtn: document.getElementById('settingsBtn'),
-    version: document.getElementById('versionLabel'),
-    upgrade: document.getElementById('upgradeLink'),
+    blocked: $('blocked'),
+    blockedIcon: $('blockedIcon'),
+    blockedTitle: $('blockedTitle'),
+    blockedBody: $('blockedBody'),
+    progress: $('progress'),
+    progressStage: $('progressStage'),
+    progressCount: $('progressCount'),
+    progressBar: $('progressBar'),
+    formatBtn: $('formatBtn'),
+    formatValue: $('formatValue'),
+    formatList: $('formatList'),
+    exportBtn: $('exportBtn'),
+    btnText: $('btnText'),
+    libraryBtn: $('exportLibraryBtn'),
+    libraryProBadge: $('libraryProBadge'),
+    message: $('message'),
+    messageLabel: $('messageLabel'),
+    messageBody: $('messageBody'),
+    messageAction: $('messageAction'),
+    messageActionText: $('messageActionText'),
+    settingsBtn: $('settingsBtn'),
+    version: $('versionLabel'),
+    upgrade: $('upgradeLink'),
+    tier: $('tierLabel'),
   };
 
   let isPro = false;
   let onPromptPage = false;
+  let exporting = false;
+  let selectedFormat = 'markdown';
+  let lastProgress = null;
+  let pollTimer = null;
 
-  const showMessage = (type, text, label) => {
-    el.message.className = `message ${type}`;
-    el.message.textContent = '';
-    if (label) {
-      const tag = document.createElement('span');
-      tag.className = 'label';
-      tag.textContent = label;
-      el.message.appendChild(tag);
-    }
-    el.message.appendChild(document.createTextNode(text));
-  };
+  // --- notices ------------------------------------------------------------
 
   /**
-   * Report on the export that ran while the popup was closed.
-   *
-   * The popup closes itself the moment it starts one — it is destroyed on blur
-   * regardless — so this is the only place a result is ever read. Opening the
-   * popup is also the acknowledgement that clears a sticky toolbar badge.
+   * One notice pattern, four tones, optionally with an action.
+   * @param {?('ok'|'warn'|'err'|'info')} tone - null for the neutral slate
    */
-  async function showLastRun() {
-    let status = null;
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'status:seen' });
-      status = response && response.status;
-    } catch (_) {
-      // Service worker unreachable; nothing to report.
+  function showMessage(tone, label, body, action) {
+    el.message.className = `notice${tone ? ` is-${tone}` : ''}`;
+    el.message.hidden = false;
+    el.messageLabel.textContent = label || '';
+    el.messageLabel.hidden = !label;
+    el.messageBody.textContent = body || '';
+    el.messageAction.hidden = !action;
+    if (action) {
+      el.messageActionText.textContent = action.label;
+      el.messageAction.onclick = action.run;
     }
-    if (!status || !status.text || status.state === 'idle') return;
-    if (status.state === 'running' || status.state === 'reading') return;
-
-    const label = { done: 'Last export', partial: 'Last export — check this', failed: 'Last export failed' }[
-      status.state
-    ];
-    showMessage(AISE.badge.toneFor(status.state), status.text, label);
   }
+
+  const hideMessage = () => { el.message.hidden = true; };
+
+  function showBlocked(tone, icon, title, body) {
+    el.blocked.className = `notice has-icon is-${tone}`;
+    el.blocked.hidden = false;
+    el.blockedIcon.setAttribute('href', icon);
+    el.blockedTitle.textContent = title;
+    el.blockedBody.textContent = body;
+  }
+
+  const hideBlocked = () => { el.blocked.hidden = true; };
+
+  // --- format picker ------------------------------------------------------
+
+  /**
+   * A listbox rather than a <select>, because the native control cannot show
+   * which formats are locked. Hiding the Pro formats entirely means nobody
+   * discovers what Pro buys, so they stay visible, chipped and unselectable.
+   */
+  function renderFormats(selected) {
+    el.formatList.textContent = '';
+    for (const format of AI_STUDIO_FORMATS) {
+      const locked = format.pro && !isPro;
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'picker-opt';
+      option.dataset.value = format.id;
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', String(format.id === selected));
+      if (locked) option.setAttribute('aria-disabled', 'true');
+
+      const name = document.createElement('span');
+      name.textContent = format.label;
+      option.appendChild(name);
+
+      if (locked) {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = 'PRO';
+        option.appendChild(chip);
+      }
+
+      option.addEventListener('click', () => {
+        if (locked) return;
+        pickFormat(format.id);
+        closeList();
+        el.formatBtn.focus();
+      });
+      el.formatList.appendChild(option);
+    }
+  }
+
+  function pickFormat(id) {
+    const format = AI_STUDIO_FORMATS.find((f) => f.id === id);
+    if (!format || (format.pro && !isPro)) return;
+    selectedFormat = id;
+    el.formatValue.textContent = format.label;
+    for (const option of el.formatList.children) {
+      option.setAttribute('aria-selected', String(option.dataset.value === id));
+    }
+    chrome.storage.sync.set({ defaultFormat: id });
+  }
+
+  const listOpen = () => el.formatBtn.getAttribute('aria-expanded') === 'true';
+
+  function openList() {
+    if (el.formatBtn.disabled) return;
+    el.formatList.hidden = false;
+    el.formatBtn.setAttribute('aria-expanded', 'true');
+    const current = el.formatList.querySelector('[aria-selected="true"]');
+    (current || el.formatList.firstElementChild).focus();
+  }
+
+  function closeList() {
+    el.formatList.hidden = true;
+    el.formatBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  el.formatBtn.addEventListener('click', () => (listOpen() ? closeList() : openList()));
+
+  el.formatList.addEventListener('keydown', (event) => {
+    const options = [...el.formatList.children];
+    const at = options.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const next = event.key === 'ArrowDown' ? at + 1 : at - 1;
+      (options[next] || options[event.key === 'ArrowDown' ? 0 : options.length - 1]).focus();
+    } else if (event.key === 'Escape') {
+      closeList();
+      el.formatBtn.focus();
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (listOpen() && !event.target.closest('.picker')) closeList();
+  });
+
+  // --- state --------------------------------------------------------------
 
   el.version.textContent = `v${chrome.runtime.getManifest().version}`;
 
@@ -74,125 +177,177 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.tabs.create({ url: AI_STUDIO_PRO.purchaseUrl });
   });
 
-  // --- format picker ----------------------------------------------------
-
-  function renderFormats(selected) {
-    el.format.textContent = '';
-    for (const format of AI_STUDIO_FORMATS) {
-      const option = document.createElement('option');
-      option.value = format.id;
-      // Locked formats stay visible but unselectable: hiding them entirely
-      // means nobody discovers what Pro actually buys.
-      option.disabled = format.pro && !isPro;
-      option.textContent = format.pro && !isPro ? `${format.label} — Pro` : format.label;
-      el.format.appendChild(option);
+  /** Paint the progress panel from whatever the content script last reported. */
+  function renderProgress(progress) {
+    lastProgress = progress || null;
+    if (!progress) {
+      el.progress.hidden = true;
+      return;
     }
-    el.format.value = selected;
-    if (el.format.selectedIndex === -1 || el.format.options[el.format.selectedIndex].disabled) {
-      el.format.value = 'markdown';
+    el.progress.hidden = false;
+    el.progress.className = `progress${progress.tone === 'warn' ? ' is-warn' : ''}`;
+    el.progressStage.textContent = progress.stage || 'Export in progress';
+    el.progressCount.textContent = progress.total ? `${progress.done} / ${progress.total}` : '';
+
+    const fill = el.progressBar.firstElementChild;
+    if (progress.total) {
+      el.progressBar.className = `bar${progress.tone === 'warn' ? ' is-warn' : ''}`;
+      fill.style.width = `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%`;
+    } else {
+      el.progressBar.className = 'bar is-indeterminate';
+      fill.style.width = '';
     }
   }
 
-  el.format.addEventListener('change', () => {
-    chrome.storage.sync.set({ defaultFormat: el.format.value });
-  });
+  function setExporting(active, progress) {
+    exporting = active;
+    el.formatBtn.disabled = active;
+    if (active) closeList();
+    renderProgress(active ? progress || lastProgress || {} : null);
 
-  // --- state ------------------------------------------------------------
+    el.exportBtn.disabled = active ? false : !onPromptPage;
+    el.exportBtn.className = active ? 'btn btn-danger' : 'btn btn-primary';
+    el.btnText.textContent = active ? 'Stop export' : 'Export this conversation';
+    el.libraryBtn.disabled = active || !isPro;
+  }
 
-  const setStatus = (active, text, icon) => {
-    el.status.className = active ? 'status active' : 'status inactive';
-    el.statusText.textContent = text;
-    el.statusIcon.textContent = icon;
-  };
-
-  const setBusy = (busy, exporting) => {
-    if (busy && exporting) {
-      el.exportBtn.classList.add('stop-mode');
-      el.exportBtn.disabled = false;
-      el.btnText.textContent = 'Stop Export';
-      el.libraryBtn.disabled = true;
-      return;
-    }
-    el.exportBtn.classList.remove('stop-mode');
-    el.exportBtn.disabled = busy || !onPromptPage;
-    el.btnText.innerHTML = busy
-      ? '<span class="spinner"></span> Starting…'
-      : 'Export Conversation';
-    el.libraryBtn.disabled = busy || !isPro;
-  };
+  /** While an export runs, the popup is the only live view of it. */
+  function startPolling(tabId) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try {
+        const status = await chrome.tabs.sendMessage(tabId, { action: 'getStatus' });
+        if (!status || !status.isExporting) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          setExporting(false);
+          await showLastRun();
+          return;
+        }
+        renderProgress(status.progress);
+      } catch (_) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        setExporting(false);
+      }
+    }, 500);
+  }
 
   async function refresh() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const onAIStudio = tab && isAIStudioUrl(tab.url);
-    onPromptPage = tab && isAIStudioPromptUrl(tab.url);
+    onPromptPage = !!(tab && isAIStudioPromptUrl(tab.url));
 
     if (!onAIStudio) {
-      setStatus(false, 'Open aistudio.google.com to export', '⚠');
-      setBusy(false);
+      showBlocked('err', '#i-alert', 'Not on AI Studio', 'Open aistudio.google.com to export.');
+      setExporting(false);
       el.exportBtn.disabled = true;
       el.libraryBtn.disabled = true;
       return;
     }
 
     if (!onPromptPage) {
-      setStatus(true, 'Open a conversation to export it', 'ℹ');
+      showBlocked('warn', '#i-clock', 'No conversation open', 'Open one, then reopen this popup.');
     } else {
-      setStatus(true, 'Connected to AI Studio', '✓');
+      hideBlocked();
     }
 
     try {
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'getStatus' });
-      if (response && response.isExporting) {
-        setStatus(true, 'Export in progress…', '⏳');
-        setBusy(true, true);
+      const status = await chrome.tabs.sendMessage(tab.id, { action: 'getStatus' });
+      if (status && status.isExporting) {
+        hideBlocked();
+        setExporting(true, status.progress);
+        startPolling(tab.id);
         return;
       }
     } catch (_) {
       // Content script not injected yet; the page probably needs a reload.
     }
-    setBusy(false);
+    setExporting(false);
   }
 
-  // --- actions ----------------------------------------------------------
+  /**
+   * Report on the export that ran while the popup was closed.
+   *
+   * Opening the popup is also the acknowledgement that clears a sticky badge,
+   * so this runs on every open, not only when there is something to say.
+   */
+  async function showLastRun() {
+    let status = null;
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'status:seen' });
+      status = response && response.status;
+    } catch (_) {
+      return;
+    }
+    if (!status || !status.text || status.state === 'idle') return;
+    if (status.state === 'running' || status.state === 'reading') return;
+
+    // A downgrade is red on the toolbar because you asked for one thing and
+    // got another, but here there is room to be precise: a file was produced,
+    // so the notice is amber and carries the way out.
+    if (status.kind === 'downgrade') {
+      showMessage('warn', 'Exported in the wrong format', status.text, {
+        label: 'Unlock Pro',
+        run: () => chrome.tabs.create({ url: AI_STUDIO_PRO.purchaseUrl }),
+      });
+      return;
+    }
+
+    const label = {
+      done: 'Last export',
+      partial: 'Last export, check this',
+      failed: 'Last export failed',
+    }[status.state];
+    const tone = { done: 'ok', partial: 'warn', failed: 'err' }[status.state];
+    showMessage(tone, label, status.text);
+  }
+
+  // --- actions ------------------------------------------------------------
 
   async function withTab(fn) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || !isAIStudioUrl(tab.url)) {
-      showMessage('error', 'Open aistudio.google.com first.');
+      showMessage('err', null, 'Open aistudio.google.com first.');
       return;
     }
     try {
       await fn(tab);
     } catch (error) {
-      setBusy(false);
+      setExporting(false);
       const message = error && error.message ? error.message : String(error);
-      showMessage(
-        'error',
-        /Could not establish connection|Receiving end does not exist/.test(message)
-          ? 'Reload the AI Studio page, then try again.'
-          : message
-      );
+      if (/Could not establish connection|Receiving end does not exist/.test(message)) {
+        showMessage('err', null, 'Reload the AI Studio page, then try again.', {
+          label: 'Reload the tab',
+          run: () => { chrome.tabs.reload(tab.id); window.close(); },
+        });
+      } else {
+        showMessage('err', null, message);
+      }
     }
   }
 
   el.exportBtn.addEventListener('click', () =>
     withTab(async (tab) => {
-      if (el.exportBtn.classList.contains('stop-mode')) {
+      if (exporting) {
         await chrome.tabs.sendMessage(tab.id, { action: 'cancel' });
-        setBusy(false);
-        setStatus(true, 'Export cancelled', '✓');
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        const at = lastProgress && lastProgress.total
+          ? `Cancelled at ${lastProgress.done} of ${lastProgress.total}. Nothing was saved.`
+          : 'Cancelled. Nothing was saved.';
+        setExporting(false);
+        showMessage(null, 'Last export', at);
         return;
       }
       if (!onPromptPage) {
-        showMessage('error', 'Open a conversation first.');
+        showMessage('err', null, 'Open a conversation first.');
         return;
       }
 
-      setBusy(true);
-      el.message.className = 'message';
-      chrome.tabs.sendMessage(tab.id, { action: 'export', formatId: el.format.value });
-      // The overlay in the page reports progress from here; the popup would be
-      // destroyed the moment it loses focus.
+      hideMessage();
+      chrome.tabs.sendMessage(tab.id, { action: 'export', formatId: selectedFormat });
+      // The overlay in the page reports progress from here; this window would
+      // be destroyed the moment it loses focus anyway.
       window.close();
     })
   );
@@ -200,27 +355,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   el.libraryBtn.addEventListener('click', () =>
     withTab(async (tab) => {
       if (!isPro) {
-        showMessage('info', 'Library export is a Pro feature.');
+        showMessage('info', null, 'Library export is a Pro feature.', {
+          label: 'Upgrade now',
+          run: () => chrome.tabs.create({ url: AI_STUDIO_PRO.purchaseUrl }),
+        });
         return;
       }
-      setBusy(true);
-      el.message.className = 'message';
-      chrome.tabs.sendMessage(tab.id, { action: 'exportLibrary', formatId: el.format.value });
+      hideMessage();
+      chrome.tabs.sendMessage(tab.id, { action: 'exportLibrary', formatId: selectedFormat });
       window.close();
     })
   );
 
-  // --- boot -------------------------------------------------------------
+  // --- boot ---------------------------------------------------------------
 
   isPro = await AISE.license.isPro({ skipRevalidation: true });
   el.libraryProBadge.hidden = isPro;
   el.upgrade.hidden = isPro;
+  el.tier.hidden = !isPro;
 
   const stored = await new Promise((resolve) =>
     chrome.storage.sync.get(AI_STUDIO_DEFAULT_SETTINGS, (s) => resolve(sanitizeSettings(s)))
   );
   renderFormats(stored.defaultFormat);
+  const initial = AI_STUDIO_FORMATS.find((f) => f.id === stored.defaultFormat);
+  pickFormat(initial && !(initial.pro && !isPro) ? stored.defaultFormat : 'markdown');
 
   await refresh();
-  await showLastRun();
+  if (!exporting) await showLastRun();
 });

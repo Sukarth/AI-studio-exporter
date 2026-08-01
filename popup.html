@@ -3,230 +3,164 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Studio Exporter</title>
+  <link rel="stylesheet" href="theme.css">
   <style>
-    :root {
-      --bg-color: #1a1b1e;
-      --card-bg: #25262b;
-      --text-primary: #e9ecef;
-      --text-secondary: #a5a5a5;
-      --accent-color: #667eea;
-      --border-color: #2c2e33;
-    }
+    body { width: 340px; }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    .pop { display: flex; flex-direction: column; gap: 16px; padding: 18px; }
 
-    body {
-      width: 340px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-primary);
-    }
-
-    .container { padding: 18px; }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .header h1 {
-      font-size: 17px;
-      font-weight: 600;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
+    .pop-head { display: flex; justify-content: space-between; align-items: center; }
+    .pop-head h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
     .icon-btn {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 8px;
-      display: inline-flex;
-      transition: all .16s ease;
+      display: inline-flex; padding: 4px; border: none; background: none;
+      color: var(--dim); cursor: pointer; border-radius: var(--r-sm);
     }
-    .icon-btn:hover { color: #fff; background: rgba(102, 126, 234, .1); }
-    .icon-btn svg { width: 19px; height: 19px; display: block; }
+    .icon-btn:hover { color: var(--text); }
+    .icon-btn svg { width: 16px; height: 16px; display: block; }
 
-    .content {
-      background-color: var(--card-bg);
-      border-radius: 12px;
-      padding: 16px;
-      border: 1px solid var(--border-color);
+    /* progress panel, only while an export is running */
+    .progress { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-lg); background: var(--accent-10); }
+    .progress[hidden] { display: none; }
+    .progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    .progress-stage { font-size: 12.5px; font-weight: 600; color: var(--accent-soft); }
+    .progress-count { font-family: var(--mono); font-size: 11px; color: var(--accent-soft); white-space: nowrap; }
+    .progress.is-warn { background: var(--warn-10); }
+    .progress.is-warn .progress-stage, .progress.is-warn .progress-count { color: var(--warn-label); }
+
+    /* format picker */
+    .picker { display: flex; flex-direction: column; gap: 6px; }
+    .picker-btn {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      width: 100%; padding: 10px 12px; background: var(--field);
+      border: 1px solid var(--line); border-radius: var(--r-md);
+      color: var(--text); font-family: var(--sans); font-size: 13px; cursor: pointer;
+      text-align: left;
     }
+    .picker-btn:hover:not(:disabled) { border-color: #3a3e48; }
+    .picker-btn[aria-expanded='true'] { border-color: var(--accent); }
+    .picker-btn:disabled { color: var(--dim); cursor: not-allowed; }
+    .picker-btn svg { width: 12px; height: 12px; color: var(--dim); flex: 0 0 auto; }
 
-    .status {
-      margin-bottom: 14px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 12.5px;
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      background-color: var(--bg-color);
-      border: 1px solid var(--border-color);
+    .picker-list {
+      display: flex; flex-direction: column; padding: 6px 0;
+      background: var(--raised); border: 1px solid var(--line);
+      border-radius: var(--r-md); max-height: 232px; overflow-y: auto;
     }
-    .status.active { border-color: #2b8a3e; color: #69db7c; }
-    .status.inactive { border-color: #c92a2a; color: #ff8787; }
-
-    label.field { display: block; margin-bottom: 12px; }
-    label.field span {
-      display: block;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      color: var(--text-secondary);
-      margin-bottom: 5px;
+    .picker-list[hidden] { display: none; }
+    .picker-opt {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 7px 12px; font-size: 12.5px; color: var(--text-2); cursor: pointer;
+      border: none; background: none; font-family: var(--sans); text-align: left; width: 100%;
     }
+    .picker-opt:hover:not([aria-disabled='true']) { background: #1d1f24; }
+    .picker-opt[aria-selected='true'] { background: rgba(79, 157, 250, 0.12); color: var(--accent-softer); }
+    .picker-opt[aria-disabled='true'] { color: var(--disabled-ink); cursor: not-allowed; }
+    .picker-opt:focus-visible { outline: none; background: #1d1f24; box-shadow: inset 2px 0 0 var(--accent); }
 
-    select {
-      width: 100%;
-      padding: 8px 10px;
-      background: var(--bg-color);
-      color: var(--text-primary);
-      border: 1px solid var(--border-color);
-      border-radius: 7px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    select:focus { outline: none; border-color: var(--accent-color); }
-
-    button.action {
-      width: 100%;
-      padding: 11px;
-      border: none;
-      border-radius: 8px;
-      font-size: 13.5px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all .25s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-    }
-
-    .primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
-    .primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, .4); }
-
-    .secondary {
-      background: transparent;
-      color: var(--text-primary);
-      border: 1px solid var(--border-color);
-      margin-top: 8px;
-    }
-    .secondary:hover:not(:disabled) { border-color: var(--accent-color); color: #fff; }
-
-    button.action:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
-    button.action.stop-mode { background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%); color: #fff; }
-
-    .badge {
-      font-size: 9.5px;
-      font-weight: 700;
-      letter-spacing: .05em;
-      padding: 2px 5px;
-      border-radius: 4px;
-      background: rgba(102, 126, 234, .18);
-      color: #a5b4fc;
-      border: 1px solid rgba(102, 126, 234, .35);
-    }
-
-    .message {
-      margin-top: 11px;
-      padding: 9px 10px;
-      border-radius: 6px;
-      font-size: 11.5px;
-      line-height: 1.45;
-      display: none;
-    }
-    .message.success { background: rgba(43, 138, 62, .15); color: #69db7c; border: 1px solid rgba(43, 138, 62, .3); display: block; }
-    .message.error { background: rgba(201, 42, 42, .15); color: #ff8787; border: 1px solid rgba(201, 42, 42, .3); display: block; }
-    .message.info { background: rgba(102, 126, 234, .12); color: #a5b4fc; border: 1px solid rgba(102, 126, 234, .3); display: block; }
-    .message.warn { background: rgba(178, 106, 0, .16); color: #ffc078; border: 1px solid rgba(178, 106, 0, .4); display: block; }
-
-    .message .label {
-      display: block;
-      font-size: 9.5px;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      opacity: .75;
-      margin-bottom: 2px;
-    }
+    .actions { display: flex; flex-direction: column; gap: 8px; }
+    .actions .btn { width: 100%; padding: 12px; font-size: 13.5px; }
+    .actions .btn-quiet { padding: 11px; }
 
     .spinner {
-      display: inline-block;
-      width: 13px;
-      height: 13px;
-      border: 2px solid rgba(255, 255, 255, .3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
+      width: 13px; height: 13px; border-radius: 50%;
+      border: 2px solid rgba(207, 228, 253, 0.35); border-top-color: var(--accent-softer);
+      animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .btn.is-busy { background: var(--accent-22); color: var(--accent-softer); cursor: wait; }
 
-    .footer {
-      text-align: center;
-      margin-top: 13px;
-      font-size: 10px;
-      color: var(--text-secondary);
-      opacity: .65;
-    }
-    .footer a { color: inherit; }
+    .pop-foot { display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; color: var(--dimmer); }
+    .pop-foot a { color: var(--accent-soft); text-decoration: none; }
+    .pop-foot a:hover { color: var(--accent-softer); }
+    .pop-foot .tier { color: var(--accent-soft); }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <div class="header">
+  <!-- Icons are inlined once and referenced with <use>: no network, no font,
+       and the stroke colour follows currentColor like any other text. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-2.8-1.6L13.6 2h-3.2l-.4 2.9a7.6 7.6 0 0 0-2.8 1.6l-2.3-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3.2l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 2.8 1.6l.4 2.9h3.2l.4-2.9a7.6 7.6 0 0 0 2.8-1.6l2.3 1 2-3.4z"></path>
+      </symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3.5 2.8 19.5h18.4L12 3.5z"></path><path d="M12 9.5v4"></path><path d="M12 16.8h.01"></path>
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.2l3.2 2"></path>
+      </symbol>
+      <symbol id="i-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m6 9.5 6 6 6-6"></path>
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.5 12h15"></path><path d="m13.5 6 6 6-6 6"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="pop">
+    <div class="pop-head">
       <h1>AI Studio Exporter</h1>
-      <div style="display:flex; align-items:center; gap:2px;">
-        <a id="githubLink" class="icon-btn" href="https://github.com/Sukarth/AI-studio-exporter"
-           target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View on GitHub">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-            <path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.93 3.19 9.11 7.61 10.58.56.1.76-.24.76-.53 0-.26-.01-1.14-.02-2.07-3.09.67-3.74-1.49-3.74-1.49-.5-1.27-1.22-1.61-1.22-1.61-.99-.68.08-.67.08-.67 1.1.08 1.68 1.13 1.68 1.13.98 1.67 2.57 1.19 3.2.91.1-.71.38-1.19.69-1.46-2.47-.28-5.06-1.24-5.06-5.52 0-1.22.44-2.22 1.16-3.01-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.11 1.15a10.78 10.78 0 0 1 2.83-.38c.96 0 1.93.13 2.83.38 2.16-1.46 3.11-1.15 3.11-1.15.61 1.54.23 2.68.11 2.96.72.79 1.16 1.79 1.16 3.01 0 4.29-2.6 5.24-5.08 5.51.39.34.74 1.02.74 2.06 0 1.49-.01 2.69-.01 3.06 0 .29.2.64.77.53C19.06 20.86 22.25 16.68 22.25 11.75 22.25 5.48 17.27.5 12 .5z"/>
-          </svg>
-        </a>
-        <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
+      <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
+        <svg><use href="#i-settings"></use></svg>
+      </button>
+    </div>
+
+    <!-- Only rendered when something stops you exporting. A green "everything
+         is fine" row is a row that is right 95% of the time and therefore
+         never read. -->
+    <div id="blocked" class="notice has-icon" hidden>
+      <svg><use id="blockedIcon" href="#i-alert"></use></svg>
+      <div class="notice-text">
+        <span id="blockedTitle" class="notice-label"></span>
+        <span id="blockedBody" class="notice-body"></span>
       </div>
     </div>
 
-    <div class="content">
-      <div id="status" class="status inactive">
-        <span class="status-icon">&#9888;</span>
-        <span id="statusText">Not on AI Studio</span>
+    <div id="progress" class="progress" hidden>
+      <div class="progress-top">
+        <span id="progressStage" class="progress-stage">Export in progress</span>
+        <span id="progressCount" class="progress-count"></span>
       </div>
-
-      <label class="field" for="formatSelect">
-        <span>Export format</span>
-        <select id="formatSelect"></select>
-      </label>
-
-      <button id="exportBtn" class="action primary" disabled>
-        <span id="btnText">Export Conversation</span>
-      </button>
-
-      <button id="exportLibraryBtn" class="action secondary" disabled>
-        <span id="libraryBtnText">Export Entire Library</span>
-        <span id="libraryProBadge" class="badge" hidden>PRO</span>
-      </button>
-
-      <div id="message" class="message"></div>
+      <div id="progressBar" class="bar is-indeterminate"><span style="width:0%"></span></div>
     </div>
 
-    <div class="footer">
-      <span id="versionLabel"></span> &middot; <a id="upgradeLink" href="#" hidden>Unlock Pro</a>
+    <div class="picker">
+      <span class="field-label" id="formatLabel">Export format</span>
+      <button id="formatBtn" class="picker-btn" type="button"
+              aria-haspopup="listbox" aria-expanded="false" aria-labelledby="formatLabel formatBtn">
+        <span id="formatValue">Markdown</span>
+        <svg><use href="#i-caret"></use></svg>
+      </button>
+      <div id="formatList" class="picker-list" role="listbox" aria-labelledby="formatLabel" hidden></div>
+    </div>
+
+    <div class="actions">
+      <button id="exportBtn" class="btn btn-primary" disabled>
+        <span id="btnText">Export this conversation</span>
+      </button>
+      <button id="exportLibraryBtn" class="btn btn-quiet" disabled>
+        <span>Export entire library</span>
+        <span id="libraryProBadge" class="chip" hidden>PRO</span>
+      </button>
+    </div>
+
+    <div id="message" class="notice" hidden>
+      <span id="messageLabel" class="notice-label"></span>
+      <span id="messageBody" class="notice-body"></span>
+      <button id="messageAction" class="notice-action" type="button" hidden>
+        <span id="messageActionText"></span>
+        <svg><use href="#i-arrow"></use></svg>
+      </button>
+    </div>
+
+    <div class="pop-foot">
+      <span id="versionLabel" class="mono"></span>
+      <a id="upgradeLink" href="#" hidden>Unlock Pro</a>
+      <span id="tierLabel" class="tier" hidden>Pro</span>
     </div>
   </div>
 

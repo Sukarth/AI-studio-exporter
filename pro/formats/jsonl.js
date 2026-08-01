@@ -60,7 +60,7 @@
   AISE.formats = AISE.formats || {};
   AISE.formats.jsonl = {
     id: 'jsonl',
-    label: 'JSONL — fine-tuning (.jsonl)',
+    label: 'JSONL: fine-tuning (.jsonl)',
     extension: 'jsonl',
     mimeType: 'application/jsonl',
     pro: true,

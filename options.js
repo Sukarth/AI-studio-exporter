@@ -7,7 +7,7 @@
  * @license MIT
  */
 
-// Every boolean setting is rendered as a checkbox of the same id, so the
+// Every boolean setting is rendered as a switch of the same id, so the
 // bindings are derived rather than listed twice.
 const CHECKBOX_SETTINGS = Object.keys(AI_STUDIO_DEFAULT_SETTINGS).filter(
   (key) => typeof AI_STUDIO_DEFAULT_SETTINGS[key] === 'boolean'
@@ -19,17 +19,61 @@ let isPro = false;
 
 // --- helpers -------------------------------------------------------------
 
+let toastTimer = null;
+
 function toast(text) {
-  const node = el('toast');
-  node.textContent = text;
-  node.classList.add('show');
-  setTimeout(() => node.classList.remove('show'), 2600);
+  el('toastText').textContent = text;
+  el('toast').classList.add('is-shown');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el('toast').classList.remove('is-shown'), 2600);
 }
 
-function notice(id, type, text) {
+/**
+ * The same notice as the popup: a tone, an uppercase label and a sentence.
+ * @param {?('ok'|'warn'|'err'|'info')} tone - null for the neutral slate
+ */
+function notice(id, tone, label, body) {
   const node = el(id);
-  node.className = `notice ${type}`;
-  node.textContent = text;
+  node.className = `notice${tone ? ` is-${tone}` : ''}`;
+  node.hidden = false;
+  const labelNode = node.querySelector('.notice-label');
+  labelNode.textContent = label || '';
+  labelNode.hidden = !label;
+  node.querySelector('.notice-body').textContent = body || '';
+}
+
+const clearNotice = (id) => { el(id).hidden = true; };
+
+/**
+ * A confirm dialog that matches the rest of the extension.
+ *
+ * window.confirm renders the browser's own chrome, which on a settings page
+ * that has just been restyled is the one thing on screen that is not ours.
+ * @returns {Promise<boolean>}
+ */
+function confirmDialog({ title, body, confirmLabel }) {
+  return new Promise((resolve) => {
+    el('resetTitle').textContent = title;
+    el('resetTitle').nextElementSibling.textContent = body;
+    el('resetConfirm').textContent = confirmLabel;
+    el('resetScrim').hidden = false;
+    el('resetCancel').focus();
+
+    const finish = (answer) => {
+      el('resetScrim').hidden = true;
+      el('resetConfirm').onclick = null;
+      el('resetCancel').onclick = null;
+      document.removeEventListener('keydown', onKey);
+      resolve(answer);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') finish(false);
+    };
+
+    el('resetConfirm').onclick = () => finish(true);
+    el('resetCancel').onclick = () => finish(false);
+    document.addEventListener('keydown', onKey);
+  });
 }
 
 function fillFormatSelect(select, selected) {
@@ -38,7 +82,7 @@ function fillFormatSelect(select, selected) {
     const option = document.createElement('option');
     option.value = format.id;
     option.disabled = format.pro && !isPro;
-    option.textContent = format.pro && !isPro ? `${format.label} — Pro` : format.label;
+    option.textContent = format.pro && !isPro ? `${format.label} (Pro)` : format.label;
     select.appendChild(option);
   }
   select.value = selected;
@@ -50,8 +94,7 @@ function fillFormatSelect(select, selected) {
 function syncAttachmentSubOptions() {
   const enabled = el('scrapeAttachments').checked;
   const block = el('attachmentOptions');
-  block.style.opacity = enabled ? '1' : '.5';
-  block.style.pointerEvents = enabled ? 'auto' : 'none';
+  block.classList.toggle('is-off', !enabled);
   block.querySelectorAll('input').forEach((input) => { input.disabled = !enabled; });
 }
 
@@ -77,8 +120,15 @@ function saveSettings() {
   chrome.storage.sync.set(sanitizeSettings(raw), () => toast('Settings saved'));
 }
 
-function resetSettings() {
-  if (!confirm('Reset all settings to their defaults?')) return;
+async function resetSettings() {
+  const confirmed = await confirmDialog({
+    title: 'Reset all settings?',
+    body:
+      'Format, attachments, the fine-tuning options and the backup schedule go back to ' +
+      'defaults. Your licence key is kept.',
+    confirmLabel: 'Reset',
+  });
+  if (!confirmed) return;
   chrome.storage.sync.set(AI_STUDIO_DEFAULT_SETTINGS, () => {
     loadSettings();
     toast('Settings reset');
@@ -93,20 +143,26 @@ async function refreshLicenseUI() {
 
   const badge = el('proBadge');
   badge.textContent = isPro ? 'ACTIVE' : 'LOCKED';
-  badge.className = isPro ? 'badge ok' : 'badge';
+  badge.className = isPro ? 'chip chip-ok' : 'chip';
 
-  el('deactivateBtn').hidden = !isPro;
-  el('activateBtn').disabled = isPro;
-  el('licenseKey').disabled = isPro;
+  // Activating swaps the whole panel rather than disabling the field: an
+  // input you cannot type in, holding a key you cannot read, is furniture.
+  el('licenseEntry').hidden = isPro;
+  el('licenseActive').hidden = !isPro;
+  el('licenseBlurb').hidden = isPro;
+  el('buyBtn').parentElement.hidden = isPro;
+  el('licenseMasked').textContent = isPro ? status.key : '';
   el('licenseKey').value = isPro ? status.key : '';
+  el('tierLabel').hidden = !isPro;
 
+  el('backupPanel').classList.toggle('is-locked', !isPro);
   el('backupControls').classList.toggle('locked', !isPro);
-
-  if (isPro) {
-    notice('licenseNotice', 'success', 'Pro is active on this browser. Thank you for supporting the project.');
-  } else {
-    el('licenseNotice').className = 'notice';
+  el('backupProBadge').hidden = isPro;
+  for (const control of ['backupEnabled', 'backupFrequency', 'backupFormat', 'runBackupBtn']) {
+    el(control).disabled = !isPro;
   }
+
+  if (isPro) clearNotice('licenseNotice');
 
   // Format pickers gain or lose their Pro entries with the licence.
   fillFormatSelect(el('defaultFormat'), el('defaultFormat').value || 'markdown');
@@ -116,30 +172,40 @@ async function refreshLicenseUI() {
 async function activate() {
   const key = el('licenseKey').value.trim();
   if (!key) {
-    notice('licenseNotice', 'error', 'Paste the licence key from your purchase email.');
+    notice('licenseNotice', 'err', 'Not activated', 'Paste the licence key from your purchase email.');
+    el('licenseKey').classList.add('is-invalid');
     return;
   }
 
+  el('licenseKey').classList.remove('is-invalid');
   el('activateBtn').disabled = true;
-  notice('licenseNotice', 'info', 'Checking with Polar…');
+  notice('licenseNotice', 'info', null, 'Checking with Polar…');
 
   const result = await AISE.license.activate(key);
   if (result.ok) {
     await refreshLicenseUI();
+    el('activateBtn').disabled = false;
     toast('Pro unlocked');
   } else {
-    notice('licenseNotice', 'error', result.message);
+    notice('licenseNotice', 'err', 'Not activated', result.message);
+    el('licenseKey').classList.add('is-invalid');
     el('activateBtn').disabled = false;
   }
 }
 
 async function deactivate() {
-  if (!confirm('Remove the licence from this browser? You can activate it again later.')) return;
+  const confirmed = await confirmDialog({
+    title: 'Remove the licence?',
+    body: 'Pro locks on this browser. You can activate the same key again later.',
+    confirmLabel: 'Remove',
+  });
+  if (!confirmed) return;
+
   const result = await AISE.license.deactivate();
   await refreshLicenseUI();
   // The message differs when Polar could not be told, and that difference is
   // the whole point of showing it: an unreleased slot counts against the limit.
-  notice('licenseNotice', 'info', result.message);
+  notice('licenseNotice', null, 'Licence removed', result.message);
   toast('Licence removed');
 }
 
@@ -148,10 +214,17 @@ async function deactivate() {
 const sendToWorker = (message) =>
   new Promise((resolve) => chrome.runtime.sendMessage(message, (response) => resolve(response || {})));
 
-function describeBackupState(state) {
-  if (!state.lastRunAt) return 'Has not run yet.';
-  const when = new Date(state.lastRunAt).toLocaleString();
-  return `Last run ${when} — ${state.lastResult || 'no details'}`;
+const whenRun = (at) =>
+  new Date(at).toLocaleString(undefined, {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+
+/** Grade a backup result the same way the toolbar badge grades an export. */
+function backupTone(state) {
+  const result = state.lastResult || '';
+  if (/^Failed:/.test(result)) return { tone: 'err', label: 'Last backup failed' };
+  if (/failed|unavailable|reduced fidelity/i.test(result)) return { tone: 'warn', label: 'Last backup, check this' };
+  return { tone: 'ok', label: 'Last backup' };
 }
 
 async function loadBackupState() {
@@ -162,7 +235,10 @@ async function loadBackupState() {
   el('backupFrequency').value = state.frequency || 'weekly';
   fillFormatSelect(el('backupFormat'), state.formatId || 'markdown');
 
-  if (state.lastRunAt) notice('backupNotice', 'info', describeBackupState(state));
+  if (state.lastRunAt) {
+    const { tone, label } = backupTone(state);
+    notice('backupNotice', tone, label, `${whenRun(state.lastRunAt)} · ${state.lastResult || 'no details'}`);
+  }
 }
 
 async function saveBackupState() {
@@ -175,24 +251,28 @@ async function saveBackupState() {
       formatId: el('backupFormat').value,
     },
   });
-  if (state) {
-    notice(
-      'backupNotice',
-      'info',
-      state.enabled ? `Scheduled ${state.frequency}. ${describeBackupState(state)}` : 'Scheduled backup is off.'
-    );
+  if (!state) return;
+
+  if (!state.enabled) {
+    notice('backupNotice', null, 'Scheduled backup', 'Off.');
+  } else if (state.lastRunAt) {
+    const { tone, label } = backupTone(state);
+    notice('backupNotice', tone, label, `${whenRun(state.lastRunAt)} · ${state.lastResult || 'no details'}`);
+  } else {
+    notice('backupNotice', null, 'Scheduled backup', `Set to ${state.frequency}. Has not run yet.`);
   }
 }
 
 async function runBackupNow() {
   el('runBackupBtn').disabled = true;
-  notice('backupNotice', 'info', 'Running a backup now — this opens AI Studio in the background.');
+  notice('backupNotice', 'info', null, 'Running a backup now. This opens AI Studio in the background.');
 
   const result = await sendToWorker({ action: 'backup:runNow' });
   notice(
     'backupNotice',
-    result && result.success ? 'success' : 'error',
-    (result && result.message) || 'Backup failed.'
+    result && result.success ? 'ok' : 'err',
+    result && result.success ? 'Backup finished' : 'Backup failed',
+    (result && result.message) || 'No details.'
   );
   el('runBackupBtn').disabled = false;
 }

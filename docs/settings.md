@@ -11,7 +11,7 @@ afterwards: exclude reasoning and the export's own message count drops to match.
 
 ## Content
 
-### Reasoning (`scrapeReasoning`) — on
+### Reasoning (`scrapeReasoning`): on
 
 Include the model's thinking, not just its answers.
 
@@ -24,11 +24,11 @@ Off removes those turns entirely. On, each format handles them differently:
 | Obsidian | A `> [!note]-` callout, collapsed by default |
 | PDF, Word | An amber-tinted block with recoloured body text |
 | JSON, CSV | A turn with `isThought: true` / `is_reasoning: true` |
-| JSONL | **Dropped**, unless `jsonlIncludeReasoning` is on — see [format guide](formats.md#jsonl) |
+| JSONL | **Dropped**, unless `jsonlIncludeReasoning` is on; see [format guide](formats.md#jsonl) |
 
-### Images (`scrapeImages`) — on
+### Images (`scrapeImages`): on
 
-### Other attachments (`scrapeAttachments`) — on
+### Other attachments (`scrapeAttachments`): on
 
 Whether to download image attachments, and whether to download everything else.
 Split because "keep the screenshots, skip the 40 MB of CSVs" is a common want.
@@ -42,21 +42,21 @@ bug.
 Turning both off also skips the downloads, which is the fastest way to export a
 large conversation.
 
-### Condense attachments (`condenseAttachments`) — on {#condense-attachments}
+### Condense attachments (`condenseAttachments`): on {#condense-attachments}
 
 AI Studio files each attachment as its own message, so a question sent with
 three screenshots is stored as four messages: three carrying only a file, then
 one carrying the text.
 
 **On**, each run of attachment-only messages is folded into the message it was
-sent with — matching what you actually did. Token counts are summed and the
+sent with, matching what you actually did. Token counts are summed and the
 earliest timestamp wins, so no numbers change.
 
 **Off**, AI Studio's own structure is preserved. Useful if you are reconciling
 an export against the API, and misleading otherwise: it produces headed blocks
 with nothing under them.
 
-A trailing attachment with no message after it is never folded — there is
+A trailing attachment with no message after it is never folded; there is
 nothing to fold it into, and dropping it would lose the file.
 
 ---
@@ -75,7 +75,7 @@ clean transcript and nothing else.
 | `includeTokenCounts` | Per-message and total token counts | Message subtitles; `tokenCount` in JSON; the `token_count` column in CSV |
 | `includeSourceUrl` | Link back to the AI Studio conversation | Header; `url` in JSON; `source` in Obsidian frontmatter |
 
-In JSON, a field switched off is **absent**, not `null` — `null` is reserved for
+In JSON, a field switched off is **absent**, not `null`; `null` is reserved for
 "AI Studio had no value". See
 [data reference](data-reference.md#json).
 
@@ -86,9 +86,9 @@ rather than dropping the column, so the file stays parseable.
 
 ## Format-specific
 
-### `jsonlIncludeReasoning` — off
+### `jsonlIncludeReasoning`: off
 
-JSONL only. Off, reasoning turns are dropped from the dataset — training on a
+JSONL only. Off, reasoning turns are dropped from the dataset; training on a
 model's private thinking as if it were the reply teaches it to emit thinking as
 output. On, each reasoning turn becomes an `assistant` message and merges into
 the answer beside it.
@@ -97,7 +97,7 @@ the answer beside it.
 
 ## Other
 
-### `defaultFormat` — `markdown`
+### `defaultFormat`: `markdown`
 
 Which format the popup preselects.
 
@@ -124,4 +124,4 @@ Some things are limits of the format, not of a toggle:
 | --- | --- |
 | Non-Latin text becomes `?` in the PDF | The standard PDF fonts are Latin-only. Export HTML and print to PDF from your browser. |
 | An attachment shows a name but no file | The bytes could not be fetched from Drive. `path` is `null` in the JSON. |
-| Everything metadata-ish is missing at once | The export used the DOM fallback. Check `source` in the JSON — see [data reference](data-reference.md#source). |
+| Everything metadata-ish is missing at once | The export used the DOM fallback. Check `source` in the JSON; see [data reference](data-reference.md#source). |

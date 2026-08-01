@@ -27,7 +27,7 @@
    * encodeURI leaves parentheses alone, which is fine for a URL and wrong for
    * Markdown: a parser ends the target at the first `)`. That matters because
    * colliding attachment names are disambiguated with a " (2)" suffix, so any
-   * conversation with two files of the same name produced broken links — found
+   * conversation with two files of the same name produced broken links; found
    * on a real export where 12 of 42 links pointed at nothing.
    *
    * `#` would start a fragment and `?` a query, so those go too.
@@ -66,7 +66,7 @@
     facts.push(['Messages', conversation.stats.turnCount]);
 
     if (conversation.source === 'dom') {
-      facts.push(['Note', 'Exported via page scraping — some metadata unavailable']);
+      facts.push(['Note', 'Exported via page scraping: some metadata unavailable']);
     }
 
     for (const [key, value] of facts) {
@@ -88,7 +88,7 @@
     const name = part.name || (part.driveId ? `attachment-${part.driveId.slice(0, 8)}` : 'attachment');
     const size = part.byteLength ? ` _(${formatBytes(part.byteLength)})_` : '';
     if (assetPath) return `📎 [${escapeLabel(name)}](${escapeTarget(assetPath)})${size}`;
-    // No bytes retrieved — record that something was attached rather than
+    // No bytes retrieved; record that something was attached rather than
     // silently dropping it, so the export stays an honest record.
     return `📎 **${escapeLabel(name)}**${size} _(file not retrievable)_`;
   }
@@ -119,7 +119,7 @@
         meta.push(`${turn.tokenCount.toLocaleString('en-US')} tokens`);
       }
       // Without this, a message whose only content was an attachment the user
-      // opted out of renders as a bare heading — indistinguishable from a bug.
+      // opted out of renders as a bare heading; indistinguishable from a bug.
       const excluded = turn.excludedAttachments || 0;
       if (excluded) {
         meta.push(`${excluded} attachment${excluded === 1 ? '' : 's'} not included in export`);

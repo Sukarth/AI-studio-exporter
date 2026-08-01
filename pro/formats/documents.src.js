@@ -9,7 +9,7 @@
  * loading the extension unpacked still needs no npm install.
  *
  * PDF uses pdf-lib rather than a higher-level renderer. That means laying out
- * text by hand, but it keeps the bundle small and — the deciding factor — it
+ * text by hand, but it keeps the bundle small and, most importantly, it
  * runs under Node, so the output is verified by tests instead of by eye.
  *
  * @license MIT
@@ -473,7 +473,7 @@ function buildDocx(conversation, settings, assetPaths) {
 
 /**
  * Word refuses to open a package whose `[Content_Types].xml` is not the first
- * entry in the archive — "Word experienced an error trying to open the file",
+ * entry in the archive: "Word experienced an error trying to open the file".
  * with no hint as to why. OPC (ECMA-376 Part 2) requires that ordering, and
  * Packer emits it seventh, so every document produced here was unopenable.
  *
@@ -795,7 +795,7 @@ async function renderPdf(conversation, settings, assetPaths) {
   };
 
   /**
-   * Shaded, monospaced box — code fences and tables both land here. Drawn one
+   * Shaded, monospaced box: code fences and tables both land here. Drawn one
    * strip at a time on top of the role band, so the shading follows the block
    * across a page break instead of being clipped at the boundary.
    */

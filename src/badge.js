@@ -1,5 +1,5 @@
 /**
- * Toolbar badge — the extension's only always-visible surface.
+ * Toolbar badge: the extension's only always-visible surface.
  *
  * The popup closes the instant an export starts (it would be destroyed on blur
  * anyway) and the in-page overlay is suppressed for scheduled backups, so
@@ -7,7 +7,7 @@
  * alone that it failed. The badge carries that: one glyph, one colour, and a
  * stored result the popup reads back.
  *
- * Two of the five states are *sticky* — they stay until the popup is opened,
+ * Two of the five states are *sticky*: they stay until the popup is opened,
  * because "something needs your attention" is worthless if it vanishes while
  * the user is in another tab. The rest clear themselves.
  *
@@ -40,13 +40,15 @@
     },
     running: {
       text: '…',
-      color: '#5F6368',
+      color: '#6F757D',
+      ink: '#FFFFFF',
       sticky: false,
       title: 'Exporting… reading through the AI Studio API.',
     },
     reading: {
       text: '~',
-      color: '#B26A00',
+      color: '#D9A34A',
+      ink: '#1A1305',
       sticky: false,
       title:
         'Exporting… the API was unavailable, so the page is being read instead. ' +
@@ -54,20 +56,23 @@
     },
     done: {
       text: '✓',
-      color: '#2F9E44',
+      color: '#5CC98A',
+      ink: '#06170E',
       sticky: false,
       clearAfterMs: DONE_VISIBLE_MS,
       title: 'Export finished.',
     },
     partial: {
       text: '!',
-      color: '#B26A00',
+      color: '#D9A34A',
+      ink: '#1A1305',
       sticky: true,
       title: 'Export finished, but not completely. Open the popup for details.',
     },
     failed: {
       text: 'X',
-      color: '#C92A2A',
+      color: '#E8736B',
+      ink: '#1A0B0A',
       sticky: true,
       title: 'Export did not finish. Open the popup for details.',
     },
@@ -116,8 +121,8 @@
    * Whether a stored status should still be showing.
    *
    * Sticky states show until seen; `done` shows until it expires. Anything
-   * else — including a `running` state left behind by an export whose tab was
-   * closed — is only shown while it is fresh, so a crashed run cannot leave a
+   * else, including a `running` state left behind by an export whose tab was
+   * closed, is only shown while it is fresh, so a crashed run cannot leave a
    * spinner-ish badge up forever.
    */
   function shouldShow(status, now) {
@@ -135,10 +140,10 @@
     // Chrome picks a contrasting colour on its own, but not the same one on
     // every platform; pinning it keeps the amber and red legible.
     if (chrome.action.setBadgeTextColor) {
-      await chrome.action.setBadgeTextColor({ color: '#FFFFFF' });
+      await chrome.action.setBadgeTextColor({ color: spec.ink || '#FFFFFF' });
     }
     await chrome.action.setTitle({
-      title: text ? `AI Studio Exporter — ${text}` : spec.title,
+      title: text ? `AI Studio Exporter: ${text}` : spec.title,
     });
   }
 
@@ -148,12 +153,17 @@
    * Record an outcome and show it.
    * @param {string} state - a key of STATES
    * @param {string} [text] - result message, kept for the popup to read back
+   * @param {string} [kind] - what happened, when the state alone is too coarse.
+   *   'downgrade' is the only one so far: the badge is red because you did not
+   *   get what you asked for, but the popup has room to say a file still
+   *   exists and offer the way out, so it renders it amber.
    */
-  async function set(state, text) {
+  async function set(state, text, kind) {
     const spec = describe(state);
     const now = Date.now();
     const status = {
       state,
+      kind: kind || null,
       text: text || '',
       at: now,
       // Only sticky states wait to be acknowledged; marking the rest seen up
@@ -174,7 +184,7 @@
     return status;
   }
 
-  /** The popup has been opened — acknowledge whatever was waiting. */
+  /** The popup has been opened; acknowledge whatever was waiting. */
   async function seen() {
     const status = await read();
     if (status.seen && !shouldShow(status, Date.now())) {

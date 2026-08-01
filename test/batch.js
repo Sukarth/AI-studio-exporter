@@ -1,8 +1,8 @@
 /**
  * Integration test for whole-library export.
  *
- * Separate from test/run.js because it drives the real pipeline end to end —
- * JSZip, async rendering, archive generation — rather than the pure helpers.
+ * Separate from test/run.js because it drives the real pipeline end to end:
+ * JSZip, async rendering, archive generation. Rather than the pure helpers.
  * The API and the download are the only things faked, so everything between
  * "here is a library index" and "here are the bytes of a ZIP" is genuinely
  * exercised, including the paths that only misbehave at scale: name
@@ -361,7 +361,7 @@ async function main() {
         for (const entry of elsewhere) {
           assert.match(
             index,
-            new RegExp(`${entry.title} —[^\\n]*in part ${entry.volume}`),
+            new RegExp(`${entry.title}:[^\\n]*in part ${entry.volume}`),
             `volume ${i + 1} does not say where ${entry.title} is`
           );
         }
@@ -386,8 +386,8 @@ async function main() {
   await test('no volume exceeds the limit unless one conversation does', async () => {
     // The size check used to run *after* a conversation was added, and three
     // are fetched concurrently, so a volume could overshoot by three whole
-    // conversations. For anyone whose conversations are individually huge —
-    // which is most of the reason volumes exist — that defeated the limit.
+    // conversations. For anyone whose conversations are individually huge
+    // (which is most of the reason volumes exist), that defeated the limit.
     await withBigLibrary(9, 4000, 10000, async () => {
       await runLibrary('markdown');
       assert.ok(downloads.length > 1, 'the library did not split at all');
@@ -404,7 +404,7 @@ async function main() {
   });
 
   await test('a conversation larger than a whole volume gets one to itself', async () => {
-    // It cannot be split any further, so the limit has to give — but it must
+    // It cannot be split any further, so the limit has to give; but it must
     // not drag its neighbours over with it.
     await withBigLibrary(
       4, 2000, 10000,

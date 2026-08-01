@@ -65,8 +65,8 @@
   }
 
   /**
-   * Give every conversation a unique folder name. Titles collide often — AI
-   * Studio auto-names many conversations identically — so the id is appended
+   * Give every conversation a unique folder name. Titles collide often (AI
+   * Studio auto-names many conversations identically), so the id is appended
    * only when a collision actually occurs, keeping the common case readable.
    */
   function makeFolderNamer() {
@@ -123,19 +123,19 @@
       const facts = `${modified} · ${entry.turnCount} messages`;
 
       if (split && entry.volume !== volume) {
-        lines.push(`- ${entry.title} — ${facts} · **in part ${entry.volume}**`);
+        lines.push(`- ${entry.title}: ${facts} · **in part ${entry.volume}**`);
         continue;
       }
       // Folder names carry a " (id)" suffix when titles collide, and a bare
       // encodeURI would leave those parentheses to end the link early.
       const target = AISE.formats.markdown.escapeTarget(entry.path);
-      lines.push(`- [${entry.title}](${target}) — ${facts}`);
+      lines.push(`- [${entry.title}](${target}): ${facts}`);
     }
 
     if (failures.length) {
       lines.push('', '## Not exported', '');
       for (const failure of failures) {
-        lines.push(`- **${failure.title || failure.id}** — ${failure.error}`);
+        lines.push(`- **${failure.title || failure.id}**: ${failure.error}`);
       }
     }
 
@@ -188,7 +188,7 @@
     const concatenatedChunks = [];
     const entries = [];
     const failures = [];
-    // Formats can flag content they cannot represent — the PDF fonts cannot
+    // Formats can flag content they cannot represent; the PDF fonts cannot
     // draw non-Latin scripts. A single export reports this as it happens; here
     // there is no per-conversation status to attach it to, so it is collected
     // and reported once at the end rather than silently producing a few hundred
@@ -235,7 +235,7 @@
         const rendered = await format.render(conversation, settings, assetPaths);
 
         if (concatenate) {
-          // Only the first chunk keeps the format's preamble — a CSV with a
+          // Only the first chunk keeps the format's preamble; a CSV with a
           // header row repeated every few hundred lines is not a dataset.
           if (rendered) {
             const chunk =
@@ -256,7 +256,7 @@
 
           // Close the current volume *before* adding, not after. Checking
           // afterwards meant a volume could exceed the limit by however large
-          // the conversation was — and conversations of hundreds of megabytes
+          // the conversation was; and conversations of hundreds of megabytes
           // are exactly the case volumes exist for. A volume can still exceed
           // the limit, but only when one conversation does on its own, which
           // is the one case that cannot be split any further.
@@ -376,7 +376,7 @@
     }
 
     // A concatenable format can legitimately produce nothing for a conversation
-    // — JSONL skips anything without an assistant reply — so count what landed
+    // (JSONL skips anything without an assistant reply), so count what landed
     // in the file rather than what was attempted.
     const parts = [`Exported ${concatenate ? concatenatedCount : entries.length} conversations`];
     if (downloads.length > 1) parts.push(`${downloads.length} archives`);

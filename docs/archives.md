@@ -31,7 +31,7 @@ How does the RPC auth work - 2026-07-31T06-40-38.zip
 
 The document is always named `conversation.<ext>` inside the archive; the
 archive itself carries the title. Every link in the document is relative
-(`attachments/…`), so **extract the ZIP before following links** — most PDF
+(`attachments/…`), so **extract the ZIP before following links**. Most PDF
 readers and browsers will not resolve a relative link out of a compressed
 archive.
 
@@ -65,8 +65,8 @@ ai-studio-library-2026-07-31T06-40-38.zip
 ```
 
 `index.md` is a readable listing with a link to each conversation and a section
-for anything that failed. `manifest.json` is the same information for tooling —
-fields documented in
+for anything that failed. `manifest.json` is the same information for tooling;
+fields are documented in
 [data reference](data-reference.md#library-manifest).
 
 Folder names come from the conversation title. Two conversations with the same
@@ -86,8 +86,8 @@ The CSV's header row appears once at the top, not once per conversation.
 ### Large libraries
 
 A per-conversation export splits into multiple archives once the next
-conversation would push one past **256 MB** — measured before compression,
-since that is what predicts memory pressure, so the finished files are smaller.
+conversation would push one past **256 MB** (measured before compression,
+since that is what predicts memory pressure), so the finished files are smaller.
 
 ```
 ai-studio-library-2026-07-31T06-40-38 (part 1 of 3).zip
@@ -104,8 +104,8 @@ in the export: the ones in that archive are links, and the rest say which part
 holds them.
 
 ```markdown
-- [Weekly Notes](weekly-notes/conversation.md) — 2026-07-14 · 42 messages
-- Design Review — 2026-07-11 · 210 messages · **in part 3**
+- [Weekly Notes](weekly-notes/conversation.md): 2026-07-14 · 42 messages
+- Design Review: 2026-07-11 · 210 messages · **in part 3**
 ```
 
 So whichever part you open, nothing in the export is unaccounted for and no

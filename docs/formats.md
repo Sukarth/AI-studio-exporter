@@ -6,9 +6,9 @@ machine-readable three, see [data reference](data-reference.md).
 
 | Format | Extension | Pro | Ships attachments | Combines in a library export |
 | --- | --- | --- | --- | --- |
-| [Markdown](#markdown) | `.md` | — | yes | one folder per conversation |
-| [Plain text](#plain-text) | `.txt` | — | yes | one folder per conversation |
-| [JSON](#json) | `.json` | — | yes | one folder per conversation |
+| [Markdown](#markdown) | `.md` | Free | yes | one folder per conversation |
+| [Plain text](#plain-text) | `.txt` | Free | yes | one folder per conversation |
+| [JSON](#json) | `.json` | Free | yes | one folder per conversation |
 | [HTML](#html) | `.html` | Pro | yes | one folder per conversation |
 | [PDF](#pdf) | `.pdf` | Pro | yes | one folder per conversation |
 | [Word](#word) | `.docx` | Pro | yes | one folder per conversation |
@@ -18,7 +18,7 @@ machine-readable three, see [data reference](data-reference.md).
 
 "Ships attachments" means a conversation with files downloads as a `.zip`
 holding the document plus an `attachments/` folder. A conversation with no
-files downloads as a single bare document — see [what you download](archives.md).
+files downloads as a single bare document (see [what you download](archives.md)).
 
 ---
 
@@ -54,7 +54,7 @@ Attachments become links, images become embeds:
 📎 [network-log.har](attachments/network-log.har) _(1.4 MB)_
 ```
 
-Link targets are percent-encoded, including `(`, `)`, `#` and `?` — a
+Link targets are percent-encoded, including `(`, `)`, `#` and `?`. A
 parenthesis in a filename ends the link target early otherwise, which silently
 broke links for any conversation containing two files of the same name.
 
@@ -77,7 +77,7 @@ How does the RPC auth work?
 ```
 
 Attachments are named with their archive path, so the text file still tells you
-where its files are. Message bodies keep whatever Markdown the model wrote —
+where its files are. Message bodies keep whatever Markdown the model wrote;
 this format does not strip it, it just adds none of its own.
 
 **Good for:** pasting into ticket systems, email, or anything that mangles
@@ -86,8 +86,8 @@ Markdown.
 ## JSON
 
 The lossless format. Everything the extractor captured is here except the raw
-bytes, which live in `attachments/` and are referenced by path — keeping the
-JSON readable and storing each file once instead of base64'd twice.
+bytes, which live in `attachments/` and are referenced by path (this keeps the
+JSON readable and stores each file once instead of base64'd twice).
 
 ```json
 {
@@ -106,7 +106,7 @@ against future format changes.
 
 ## HTML
 
-A single self-contained page — no external CSS, fonts or scripts, nothing
+A single self-contained page with no external CSS, fonts or scripts, nothing
 loaded from the network. Attachments are referenced from the sibling
 `attachments/` folder, so keep the ZIP contents together.
 
@@ -133,13 +133,13 @@ A paginated document, A4, with page numbers.
 - Fenced code blocks and tables render in a shaded monospaced box.
 - Attachments, the source URL, Markdown links and bare URLs are **clickable**.
   Attachment links are relative to the document, which sits beside
-  `attachments/` inside the ZIP — extract the archive before following them.
+  `attachments/` inside the ZIP. Extract the archive before following them.
 
 ### The font limitation
 
 PDF is generated with the standard PDF font set, which covers Latin only.
 Smart quotes, dashes and ellipses are substituted cleanly; anything outside
-Latin-1 — CJK, Devanagari, Kannada, Cyrillic, emoji — becomes `?`.
+Latin-1 (such as CJK, Devanagari, Kannada, Cyrillic, and emoji) becomes `?`.
 
 The exporter detects this and warns before you download. **If your conversation
 is not Latin-script, export HTML and print to PDF from your browser instead.**
@@ -179,7 +179,7 @@ tags: [ai-studio, conversation]
 ```
 
 **Wikilinks** for attachments (`![[screenshot.png]]`), which resolve by vault
-filename rather than by path — so the files work once they are anywhere in the
+filename rather than by path, so the files work once they are anywhere in the
 vault.
 
 **Collapsible callouts** for reasoning (`> [!note]- 🧠 Reasoning`) and for the
@@ -196,7 +196,7 @@ reads it as UTF-8 rather than guessing your local codepage.
 Columns: [data reference](data-reference.md#csv).
 
 Every field is quoted, whether or not it needs to be. Cells beginning `=`, `+`,
-`-` or `@` are prefixed with an apostrophe — those are executed as formulas when
+`-` or `@` are prefixed with an apostrophe; those are executed as formulas when
 opened in Excel or Sheets, and message text is not something to trust.
 
 A whole-library export produces **one combined CSV** with a single header row,
@@ -223,7 +223,7 @@ Three transformations happen here that do not happen anywhere else:
 3. **Conversations with no assistant reply produce nothing.** They are not
    training examples.
 
-Attachments are not shipped — they become an `[attachment: name]` line at the
+Attachments are not shipped; they become an `[attachment: name]` line at the
 top of the message content, so the text still reflects that a file was there.
 
 A whole-library export produces **one combined `.jsonl` dataset**.

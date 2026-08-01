@@ -8,7 +8,7 @@
  *
  * This is an undocumented internal API and Google can renumber these fields at
  * any time. Every read goes through the tolerant helpers at the top so a shape
- * change degrades to missing metadata rather than a thrown exception — the
+ * change degrades to missing metadata rather than a thrown exception; the
  * caller decides whether the result is complete enough, and falls back to the
  * DOM scraper when it isn't.
  *
@@ -28,7 +28,7 @@
   };
 
   // Verified against the live UI: a prompt showing Temperature 1 in AI Studio
-  // carries 1 at index 0 and 0.95 at index 4, so index 4 is topP — not
+  // carries 1 at index 0 and 0.95 at index 4, so index 4 is topP, not
   // temperature, which the two values being close makes easy to transpose.
   const RUN_SETTINGS = {
     TEMPERATURE: 0,
@@ -48,8 +48,8 @@
 
   const TURN = {
     TEXT: 0,
-    DRIVE_REF_ALT: 1, // [driveId] — seen rarely
-    DRIVE_REF: 3,     // [driveId] — attachment reference
+    DRIVE_REF_ALT: 1, // [driveId]; seen rarely
+    DRIVE_REF: 3,     // [driveId]; attachment reference
     ROLE: 8,          // "user" | "model"
     // 1 on a model turn that is the answer; unset on one that is reasoning.
     // Note the polarity: this marks answers, not thoughts.
@@ -98,8 +98,8 @@
   }
 
   /**
-   * A turn's visible text is either the flat string at TEXT, or — when the
-   * response was streamed — the concatenation of its chunks. Prefer the flat
+   * A turn's visible text is either the flat string at TEXT, or, when the
+   * response was streamed, the concatenation of its chunks. Prefer the flat
    * string and fall back to joining parts, since the two are redundant.
    */
   function decodeText(rawTurn) {
@@ -155,7 +155,7 @@
    *
    * Prefer the part-level marker, which states it directly: a turn whose parts
    * are all flagged as thoughts is reasoning. Fall back to the turn-level flag,
-   * whose polarity is the trap here — it is set on answers, so its absence
+   * whose polarity is the trap here; it is set on answers, so its absence
    * means reasoning. Reading it as an isThought flag inverts every model turn
    * and files answers under reasoning.
    */

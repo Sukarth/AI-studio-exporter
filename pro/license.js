@@ -128,7 +128,7 @@
    * ends up locked out of a licence they paid for.
    *
    * Local removal happens regardless of what Polar says. "Remove this licence"
-   * must always work — being offline is not a reason to stay activated on a
+   * must always work; being offline is not a reason to stay activated on a
    * browser you are trying to leave.
    */
   async function deactivate() {
@@ -151,7 +151,7 @@
         ok: true,
         message:
           'Licence removed from this browser. Polar could not be reached, so the ' +
-          'activation slot is still held — you can free it from your Polar customer portal.',
+          'activation slot is still held; you can free it from your Polar customer portal.',
       };
     }
   }
@@ -159,7 +159,7 @@
   /**
    * Whether Pro features should be available.
    *
-   * A stored licence stays trusted when offline or when Polar is unreachable —
+   * A stored licence stays trusted when offline or when Polar is unreachable;
    * a paying user must never lose access because their network is down. Only an
    * explicit rejection from Polar clears it.
    */

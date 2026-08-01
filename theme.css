@@ -1,0 +1,503 @@
+/**
+ * Graphite / azure: the one design system.
+ *
+ * Every surface the extension owns reads its colour, radius and type from
+ * here. The in-page overlay is the exception by necessity: it is injected into
+ * a document we do not control, so content.js carries a copy of the tokens it
+ * needs. Change a value here and change it there.
+ *
+ * The rule the palette is built around: azure only ever means "this is the
+ * action". It is never decorative. Green, amber and red only ever mean state.
+ * Anything else is graphite.
+ *
+ * @license MIT
+ */
+
+/* Bundled rather than fetched from Google: an extension that phones home for
+   a typeface leaks every popup open, and it would not render offline. Latin
+   subsets only, 55 kB for the three files. */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('fonts/manrope-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/plex-mono-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/plex-mono-600-latin.woff2') format('woff2');
+}
+
+:root {
+  /* --- surface ------------------------------------------------------- */
+  --page: #101114;
+  --raised: #16181c;
+  --field: #1d1f24;
+  --disabled-bg: #23262c;
+
+  --line: #2b2e36;
+  --line-card: #262931;
+  --line-soft: #22242a;
+  --divider: #1e2026;
+
+  /* --- ink ----------------------------------------------------------- */
+  --text: #e7e8ea;
+  --text-2: #cfd2d8;
+  --text-3: #b9bec6;
+  --dim: #8f949c;
+  --dimmer: #6f757d;
+  --disabled-ink: #5c6169;
+
+  /* --- azure: the action --------------------------------------------- */
+  --accent: #4f9dfa;
+  --accent-hover: #6fb0fb;
+  --accent-ink: #04182e;
+  --accent-soft: #9cc9fd;
+  --accent-softer: #cfe4fd;
+  --accent-body: #b8cfe8;
+  --accent-08: rgba(79, 157, 250, 0.08);
+  --accent-10: rgba(79, 157, 250, 0.1);
+  --accent-16: rgba(79, 157, 250, 0.16);
+  --accent-22: rgba(79, 157, 250, 0.22);
+
+  /* --- state: everything else that is coloured ------------------------ */
+  --ok: #5cc98a;
+  --ok-ink: #06170e;
+  --ok-label: #8ddcaa;
+  --ok-body: #a9c9b5;
+  --ok-10: rgba(92, 201, 138, 0.1);
+  --ok-14: rgba(92, 201, 138, 0.14);
+
+  --warn: #d9a34a;
+  --warn-ink: #1a1305;
+  --warn-label: #e0be86;
+  --warn-body: #cbbfa6;
+  --warn-10: rgba(217, 163, 74, 0.1);
+  --warn-16: rgba(217, 163, 74, 0.16);
+
+  --err: #e8736b;
+  --err-ink: #1a0b0a;
+  --err-label: #f0a49e;
+  --err-body: #cbb0ad;
+  --err-10: rgba(232, 115, 107, 0.1);
+  --err-16: rgba(232, 115, 107, 0.16);
+  --err-30: rgba(232, 115, 107, 0.3);
+
+  /* --- metrics -------------------------------------------------------- */
+  --r-sm: 5px;
+  --r-md: 9px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+  --r-2xl: 16px;
+  --r-pill: 999px;
+
+  --sans: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --scrim: rgba(8, 9, 11, 0.72);
+  --lift: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Any `display` rule beats the UA stylesheet's `[hidden] { display: none }`,
+   so a flex container with the attribute set stays on screen. Every panel
+   here is a flex container. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- primitives shared by the popup and the settings page -------------- */
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: -0.01em;
+}
+
+/* Buttons ------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.btn svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-quiet {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text);
+}
+.btn-quiet:hover:not(:disabled) { border-color: var(--accent); }
+
+.btn-danger {
+  background: var(--err);
+  color: var(--err-ink);
+  font-weight: 700;
+}
+.btn-danger:hover:not(:disabled) { background: #ef8a83; }
+
+/* A destructive action that is not the point of the screen: quiet until
+   hovered, then unmistakably destructive. */
+.btn-destructive {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--dim);
+}
+.btn-destructive:hover:not(:disabled) {
+  border-color: var(--err);
+  color: var(--err);
+}
+
+.btn:disabled {
+  background: var(--disabled-bg);
+  border-color: transparent;
+  color: var(--disabled-ink);
+  cursor: not-allowed;
+}
+.btn-quiet:disabled,
+.btn-destructive:disabled {
+  background: transparent;
+  border-color: var(--line);
+}
+
+/* Chips ---------------------------------------------------------------- */
+
+.chip {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 5px;
+  border-radius: var(--r-sm);
+  background: var(--accent-16);
+  color: var(--accent-soft);
+}
+.chip-round {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  letter-spacing: 0;
+}
+.chip-ok { background: var(--ok-14); color: var(--ok-label); }
+.chip-err { background: var(--err-16); color: var(--err-label); }
+
+/* Notices: one pattern, four tones, used by both pages ------------------ */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 12px;
+  border-radius: var(--r-lg);
+  background: #1a1c21;
+}
+.notice[hidden] { display: none; }
+.notice .notice-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.notice .notice-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.notice .notice-action {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--dim);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--sans);
+}
+.notice .notice-action:hover { color: var(--text); }
+.notice .notice-action svg { width: 13px; height: 13px; }
+
+.notice.is-ok { background: var(--ok-10); }
+.notice.is-ok .notice-label { color: var(--ok); }
+.notice.is-ok .notice-body { color: var(--ok-body); }
+
+.notice.is-warn { background: var(--warn-10); }
+.notice.is-warn .notice-label { color: var(--warn); }
+.notice.is-warn .notice-body { color: var(--warn-body); }
+
+.notice.is-err { background: var(--err-10); }
+.notice.is-err .notice-label { color: var(--err); }
+.notice.is-err .notice-body { color: var(--err-body); }
+
+.notice.is-info { background: var(--accent-10); }
+.notice.is-info .notice-label { color: var(--accent-soft); }
+.notice.is-info .notice-body { color: var(--accent-body); }
+
+/* A blocked-state strip carries an icon; a history notice does not. */
+.notice.has-icon {
+  flex-direction: row;
+  gap: 10px;
+  padding: 12px;
+}
+.notice.has-icon > svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; }
+.notice.has-icon .notice-text { display: flex; flex-direction: column; gap: 2px; }
+.notice.is-err.has-icon > svg { color: var(--err); }
+.notice.is-warn.has-icon > svg { color: var(--warn); }
+.notice.is-info.has-icon > svg { color: var(--accent); }
+
+/* Progress: 4px, and always present so nothing resizes ------------------ */
+
+.bar {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: #26282f;
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+/* No total to divide by yet: sweep instead of sitting at zero. */
+.bar.is-indeterminate > span {
+  width: 30%;
+  background: var(--accent-22);
+  animation: bar-sweep 1.4s ease-in-out infinite;
+}
+.bar.is-warn > span { background: var(--warn); }
+.bar.is-muted > span { background: #4b4f57; }
+
+@keyframes bar-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(333%); }
+}
+
+/* Toggles ---------------------------------------------------------------
+   Driven by a real checkbox rather than a div with a role: the input keeps
+   the keyboard behaviour, the focus ring and the form semantics, and the
+   label next to it is only paint. */
+
+.switch-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: 38px;
+  height: 22px;
+  cursor: pointer;
+}
+/* Transparent and full-size rather than clipped to a pixel: the input stays
+   the real hit target, so pointer, keyboard and automation all reach the same
+   element, and only the paint beneath it is ours. */
+.switch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switch {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  transition: background-color 0.16s ease;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--disabled-ink);
+  transition: transform 0.16s ease, background-color 0.16s ease;
+}
+.switch-input:checked + .switch { background: var(--accent); }
+.switch-input:checked + .switch::after {
+  transform: translateX(16px);
+  background: var(--accent-ink);
+}
+.switch-input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-input:disabled { cursor: not-allowed; }
+
+/* Selects: the browser's own arrow never matches, so it is replaced ------ */
+
+.select {
+  position: relative;
+  display: block;
+}
+.select select {
+  appearance: none;
+  width: 100%;
+  padding: 9px 32px 9px 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+}
+.select select:focus-visible { outline: none; border-color: var(--accent); }
+.select select:disabled { color: var(--disabled-ink); cursor: not-allowed; }
+.select > svg {
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  color: var(--dim);
+  pointer-events: none;
+}
+
+/* Text inputs ----------------------------------------------------------- */
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.input::placeholder { color: var(--disabled-ink); }
+.input:focus-visible { outline: none; border-color: var(--accent); }
+.input.is-invalid { border-color: var(--err); }
+
+/* Modal: the same card and scrim as the injected overlay ---------------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  backdrop-filter: blur(8px);
+}
+.scrim[hidden] { display: none; }
+.modal {
+  width: 340px;
+  padding: 24px;
+  background: var(--raised);
+  border: 1px solid var(--line-card);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--lift);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.modal p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--dim); }
+.modal .modal-actions { display: flex; gap: 8px; margin-top: 6px; }
+.modal .modal-actions .btn { flex: 1; }
+
+/* Toast ----------------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(12px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: var(--r-pill);
+  background: var(--ok);
+  color: var(--ok-ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 60;
+}
+.toast svg { width: 14px; height: 14px; }
+.toast.is-shown { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -2,7 +2,7 @@
  * End-to-end UI tests, against a real Chrome with the extension really loaded.
  *
  * This is the only suite that exercises the extension pages as Chrome actually
- * runs them — real `chrome.storage`, a real service worker, real message
+ * runs them: real `chrome.storage`, a real service worker, real message
  * passing between the options page and the worker. Everything else in test/
  * runs the logic in Node with those APIs faked, which cannot catch a broken
  * manifest, an unregistered listener, or a page that throws on load.
@@ -138,7 +138,7 @@ async function main() {
       const before = await options.isChecked('#includeTokenCounts');
       await options.setChecked('#includeTokenCounts', !before);
       await options.click('#saveBtn');
-      await options.waitForSelector('#toast.show');
+      await options.waitForSelector('#toast.is-shown');
 
       const stored = await readSync(worker, 'includeTokenCounts');
       assert.strictEqual(stored.includeTokenCounts, !before);
@@ -161,9 +161,10 @@ async function main() {
     });
 
     await test('resetting restores every default', async () => {
-      options.once('dialog', (d) => d.accept());
       await options.click('#resetBtn');
-      await options.waitForSelector('#toast.show');
+      // The confirm is the extension's own dialog now, not the browser's.
+      await options.click('#resetConfirm');
+      await options.waitForSelector('#toast.is-shown');
       const stored = await readSync(worker, ['includeTokenCounts', 'defaultFormat']);
       assert.strictEqual(stored.includeTokenCounts, true);
       assert.strictEqual(stored.defaultFormat, 'markdown');
@@ -182,7 +183,7 @@ async function main() {
     });
 
     await test('the backup section is locked without a licence', async () => {
-      const locked = await options.$eval('#backupControls', (n) => n.classList.contains('locked'));
+      const locked = await options.$eval('#backupPanel', (n) => n.classList.contains('is-locked'));
       assert.strictEqual(locked, true);
     });
 
@@ -192,7 +193,7 @@ async function main() {
       polar = { status: 404, body: { detail: 'License key not found.' } };
       await options.fill('#licenseKey', 'WRONG-KEY-1234');
       await options.click('#activateBtn');
-      await options.waitForSelector('#licenseNotice.error');
+      await options.waitForSelector('#licenseNotice.is-err');
 
       assert.match(await options.textContent('#licenseNotice'), /not found/);
       assert.strictEqual(await options.textContent('#proBadge'), 'LOCKED');
@@ -202,14 +203,14 @@ async function main() {
       polar = { status: 200, body: { id: 'activation_test_1' } };
       await options.fill('#licenseKey', LICENCE_KEY);
       await options.click('#activateBtn');
-      await options.waitForSelector('#proBadge.ok');
+      await options.waitForSelector('#proBadge.chip-ok');
 
       assert.strictEqual(await options.textContent('#proBadge'), 'ACTIVE');
 
       const pdf = await options.$eval('#defaultFormat option[value="pdf"]', (n) => n.disabled);
       assert.strictEqual(pdf, false, 'Pro formats became selectable');
 
-      const locked = await options.$eval('#backupControls', (n) => n.classList.contains('locked'));
+      const locked = await options.$eval('#backupPanel', (n) => n.classList.contains('is-locked'));
       assert.strictEqual(locked, false, 'and the backup controls unlocked');
     });
 
@@ -221,7 +222,7 @@ async function main() {
     });
 
     await test('the displayed key is masked', async () => {
-      const shown = await options.inputValue('#licenseKey');
+      const shown = await options.textContent('#licenseMasked');
       assert.ok(shown.startsWith('AISE'), 'enough to recognise');
       assert.ok(!shown.includes('TEST-KEY'), 'but not enough to copy');
     });
@@ -231,7 +232,7 @@ async function main() {
     await test('enabling a backup creates a real chrome alarm', async () => {
       await options.selectOption('#backupFrequency', 'daily');
       await options.check('#backupEnabled');
-      await options.waitForSelector('#backupNotice.info');
+      await options.waitForSelector('#backupNotice:not([hidden])');
 
       const alarm = await worker.evaluate(() => chrome.alarms.get('aise:scheduled-backup'));
       assert.ok(alarm, 'no alarm registered');
@@ -241,7 +242,7 @@ async function main() {
     await test('disabling a backup clears the alarm', async () => {
       await options.uncheck('#backupEnabled');
       await options.waitForFunction(
-        () => document.getElementById('backupNotice').textContent.includes('off')
+        () => /\boff\b/i.test(document.getElementById('backupNotice').textContent)
       );
       const alarm = await worker.evaluate(() => chrome.alarms.get('aise:scheduled-backup'));
       assert.ok(!alarm, 'alarm outlived the setting');
@@ -260,17 +261,22 @@ async function main() {
     });
 
     await test('the popup refuses to export away from AI Studio', async () => {
-      assert.match(await popup.textContent('#statusText'), /Open aistudio\.google\.com/);
+      assert.match(await popup.textContent('#blockedBody'), /Open aistudio\.google\.com/);
       assert.strictEqual(await popup.isDisabled('#exportBtn'), true);
       assert.strictEqual(await popup.isDisabled('#exportLibraryBtn'), true);
     });
 
     await test('the popup shows every format, with Pro unlocked by the licence', async () => {
-      const formats = await popup.$$eval('#formatSelect option', (nodes) =>
-        nodes.map((n) => ({ value: n.value, disabled: n.disabled }))
+      // A listbox rather than a <select>, so that locked formats can carry a
+      // PRO chip instead of vanishing.
+      const formats = await popup.$$eval('#formatList .picker-opt', (nodes) =>
+        nodes.map((n) => ({
+          value: n.dataset.value,
+          locked: n.getAttribute('aria-disabled') === 'true',
+        }))
       );
       assert.strictEqual(formats.length, 9);
-      assert.strictEqual(formats.find((f) => f.value === 'docx').disabled, false);
+      assert.strictEqual(formats.find((f) => f.value === 'docx').locked, false);
     });
 
     await test('the popup hides the upgrade link once Pro is active', async () => {
@@ -288,8 +294,9 @@ async function main() {
       });
 
       await options.bringToFront();
-      options.once('dialog', (d) => d.accept());
+      // The confirm is the extension's own dialog now, not the browser's.
       await options.click('#deactivateBtn');
+      await options.click('#resetConfirm');
       await options.waitForFunction(() => document.getElementById('proBadge').textContent === 'LOCKED');
 
       assert.ok(seen.some((url) => url.endsWith('/deactivate')), `no deactivate call: ${seen}`);
@@ -300,6 +307,32 @@ async function main() {
     await test('Pro locks again after removal', async () => {
       const pdf = await options.$eval('#defaultFormat option[value="pdf"]', (n) => n.disabled);
       assert.strictEqual(pdf, true);
+    });
+
+    await test('locked formats stay listed in the popup, chipped rather than hidden', async () => {
+      // Reopened now that the licence is gone: hiding Pro formats entirely
+      // means nobody discovers what Pro buys, so they stay visible.
+      await popup.goto(popupUrl);
+      await popup.waitForSelector('#formatList .picker-opt', { state: 'attached' });
+      const free = await popup.$$eval('#formatList .picker-opt', (nodes) =>
+        nodes.map((n) => ({
+          value: n.dataset.value,
+          locked: n.getAttribute('aria-disabled') === 'true',
+          chip: !!n.querySelector('.chip'),
+        }))
+      );
+      assert.strictEqual(free.length, 9, 'nothing is hidden');
+      const pdf = free.find((f) => f.value === 'pdf');
+      assert.strictEqual(pdf.locked, true);
+      assert.strictEqual(pdf.chip, true, 'and it says why');
+      assert.strictEqual(free.find((f) => f.value === 'markdown').locked, false);
+    });
+
+    await test('the settings page reads the licence back masked, not editable', async () => {
+      await options.reload();
+      await options.waitForSelector('#licenseEntry');
+      assert.strictEqual(await options.isHidden('#licenseActive'), true, 'no active panel without a licence');
+      assert.strictEqual(await options.isVisible('#licenseEntry'), true);
     });
   } finally {
     await context.close();

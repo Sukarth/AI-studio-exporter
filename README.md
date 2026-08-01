@@ -1,6 +1,6 @@
 # 📦 AI Studio Exporter
 
-**The 100% open source Google AI Studio exporter.** Every line of it — including the paid features — is in this repository under the MIT licence.
+**The 100% open source Google AI Studio exporter.** Every line of it, including the paid features, is in this repository under the MIT licence.
 
 Export any AI Studio conversation, or your entire library, complete with attachments, reasoning, model settings and timestamps.
 
@@ -8,7 +8,7 @@ Export any AI Studio conversation, or your entire library, complete with attachm
 
 ## ✨ What it does
 
-- **Exports the whole conversation**, not just what is on screen — no scrolling, no lazy-loading gaps.
+- **Exports the whole conversation**, not just what is on screen; there is no scrolling, no lazy-loading gaps.
 - **Real attachments.** Files are fetched from Drive at full fidelity rather than saved as page thumbnails. Google Docs, Sheets and Slides are converted on the way out, and only the types you asked for are downloaded at all.
 - **Reasoning kept separate** from the answer, so you can read either without the other.
 - **Everything the API knows**: model, temperature, top-P, top-K, output limit, system instruction, per-message timestamps and token counts. Each one has its own on/off switch.
@@ -25,28 +25,28 @@ Version 2 talks to AI Studio's own API instead of scraping the page. A 200-messa
 | Markdown | `.md` | Free |
 | JSON | `.json` | Free |
 | Plain text | `.txt` | Free |
-| HTML | `.html` | Pro — one self-contained page, images inlined |
+| HTML | `.html` | Pro: one self-contained page, images inlined |
 | PDF | `.pdf` | Pro |
 | Word | `.docx` | Pro |
-| Obsidian | `.md` | Pro — frontmatter, wikilinked attachments, collapsed reasoning callouts |
-| CSV | `.csv` | Pro — one row per message |
-| JSONL | `.jsonl` | Pro — ready for fine-tuning |
+| Obsidian | `.md` | Pro: frontmatter, wikilinked attachments, collapsed reasoning callouts |
+| CSV | `.csv` | Pro: one row per message |
+| JSONL | `.jsonl` | Pro: ready for fine-tuning |
 
-**[Format documentation →](docs/README.md)** — what each format contains, every field in the JSON, JSONL and CSV exports, what lands in a `.zip`, and which setting removes what.
+**[Format documentation →](docs/README.md)** covers what each format contains, every field in the JSON, JSONL and CSV exports, what lands in a `.zip`, and which setting removes what.
 
 ## 💎 Pro
 
 A one-time payment. No subscription, no account, and the code stays open.
 
-- **Whole-library export** — every conversation in one archive, with an index, filters and automatic splitting for large libraries.
+- **Whole-library export**: every conversation in one archive, with an index, filters and automatic splitting for large libraries.
 - **Six extra formats** (above).
-- **Scheduled backups** — daily, weekly or monthly, and incremental, so a routine run only fetches what changed.
+- **Scheduled backups**: daily, weekly or monthly, and incremental, so a routine run only fetches what changed.
 
 Buy a key at [the purchase page](https://github.com/Sukarth/AI-studio-exporter#pro), paste it into the extension's settings, and it works offline from then on.
 
 ### Why is a paid tier in an open source project?
 
-Because the alternative is that this gets abandoned. Pro pays for the time to keep the extension working when Google changes their API — which they do.
+Because the alternative is that this gets abandoned. Pro pays for the time to keep the extension working when Google changes their API, which they do.
 
 To be completely straightforward about how the licence check works, since you can read the code anyway:
 
@@ -93,7 +93,7 @@ git pull origin main
 2. Click the extension icon.
 3. Pick a format and click **Export Conversation**.
 
-For the whole library, click **Export Entire Library** instead. Settings — what to include, default format, backup schedule — live behind the gear icon.
+For the whole library, click **Export Entire Library** instead. Settings, including what to include, default format, and backup schedule, live behind the gear icon.
 
 ## 📂 What you get
 
@@ -107,7 +107,7 @@ Conversation Title - 2026-07-29T14-30-00.zip
     └── notes.pdf
 ```
 
-With nothing to bundle you get the bare file — `Conversation Title - 2026-07-29T14-30-00.md` — rather than a ZIP wrapped around a single document.
+With nothing to bundle you get the bare file (for example, `Conversation Title - 2026-07-29T14-30-00.md`) rather than a ZIP wrapped around a single document.
 
 The whole library:
 
@@ -150,14 +150,14 @@ CSV and JSONL exports skip the folder structure and produce one dataset file for
 
 ## 🐛 Troubleshooting
 
-- **"Reload the AI Studio page, then try again"** — the content script has not been injected, usually right after installing or updating the extension. Refresh the tab.
-- **Export is slow, or the reasoning looks wrong** — the extension fell back to page scraping. Check the browser console (F12) for the reason and please open an issue; the API path should be handling it.
-- **Nothing happens when you click Export** — check that the page is a conversation (`aistudio.google.com/prompts/…`) rather than the library index.
-- **A few conversations failed in a library export** — the run continues past failures on purpose. `manifest.json` in the archive names each one and why.
+- **"Reload the AI Studio page, then try again"** means the content script has not been injected, usually right after installing or updating the extension. Refresh the tab.
+- **Export is slow, or the reasoning looks wrong** indicates the extension fell back to page scraping. Check the browser console (F12) for the reason and please open an issue; the API path should be handling it.
+- **Nothing happens when you click Export**: check that the page is a conversation (`aistudio.google.com/prompts/…`) rather than the library index.
+- **A few conversations failed in a library export** means the run continues past failures on purpose. `manifest.json` in the archive names each one and why.
 
 ## 🤝 Contributing
 
-Contributions are welcome, from bug reports to pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) — it covers the layout, how to run the tests (`npm test`, no dependencies needed) and how to rebuild the document bundle.
+Contributions are welcome, from bug reports to pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md), which covers the layout, how to run the tests (`npm test`, no dependencies needed) and how to rebuild the document bundle.
 
 ## 📝 License
 

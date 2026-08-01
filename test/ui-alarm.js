@@ -11,19 +11,19 @@
  * The alarm is re-created with a one-second delay purely so the test finishes:
  * Chrome honours sub-minute delays for unpacked extensions and clamps to one
  * minute otherwise, and the timeout here accommodates either. The scheduling
- * contract — that enabling a daily backup arms a 1440-minute alarm — is
+ * contract (that enabling a daily backup arms a 1440-minute alarm) is
  * asserted separately, against the alarm `configure()` actually creates.
  *
  * One boundary worth knowing: Playwright can only fulfil requests for pages it
  * opened itself, so a tab the *extension* opens reaches the real Google and is
  * bounced to a sign-in page. That splits the run in two. The tab-acquisition
- * tests use that path deliberately — it is also, exactly, the signed-out case
- * — and assert what the backup does to the user's browser. The export tests
+ * tests use that path deliberately; it is also, exactly, the signed-out case,
+ * and assert what the backup does to the user's browser. The export tests
  * then work against a page Playwright opened, so the export itself is real.
  *
  *     npm run test:ui:alarm
  *
- * Headed only, one launch per process — see the note in test/ui.js.
+ * Headed only, one launch per process; see the note in test/ui.js.
  *
  * @license MIT
  */
@@ -191,7 +191,7 @@ async function main() {
      * Wait for the content script to finish.
      *
      * A download event fires when the file starts arriving, which is before
-     * the export function returns — so starting the next backup right after it
+     * the export function returns; so starting the next backup right after it
      * is rejected with "an export is already running". Real users cannot hit
      * this; two tests in a row can.
      */
@@ -344,7 +344,7 @@ async function main() {
 
     await test('a signed-out browser is told to sign in, and told quickly', async () => {
       // This profile has no Google session, so AI Studio redirects the tab to
-      // a sign-in page — exactly what an unattended backup meets once a
+      // a sign-in page; exactly what an unattended backup meets once a
       // session expires. The extension holds no `tabs` permission and cannot
       // read the URL, so it used to wait out the full 45-second load timeout
       // and then blame the page for loading slowly.

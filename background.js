@@ -52,7 +52,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'status:set':
       // Unknown state names fall back to idle inside the badge module, so an
       // unexpected value clears the badge rather than painting nonsense.
-      AISE.badge.set(request.state, request.text).then((status) => sendResponse({ success: true, status }));
+      AISE.badge
+        .set(request.state, request.text, request.kind)
+        .then((status) => sendResponse({ success: true, status }));
       return true;
     case 'status:get':
       AISE.badge.read().then((status) => sendResponse({ success: true, status }));

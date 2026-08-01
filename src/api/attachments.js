@@ -1,13 +1,13 @@
 /**
  * Attachment resolution.
  *
- * A decoded conversation carries attachments as bare 33-character Drive ids —
+ * A decoded conversation carries attachments as bare 33-character Drive ids:
  * no filename, no MIME type, no bytes. This turns them into real files.
  *
  * Resolution is two-phase on purpose. Metadata is cheap and is the only thing
  * that says whether an id is an image or a document, and the user may have
- * asked for only one of those. Downloading first and filtering afterwards —
- * which is what this used to do — meant paying for every byte of a 200MB
+ * asked for only one of those. Downloading first and filtering afterwards
+ * (which is what this used to do) meant paying for every byte of a 200MB
  * conversation to then throw most of it away.
  *
  * Failure here is deliberately non-fatal. An attachment can be in someone
@@ -27,7 +27,7 @@
   const CONCURRENCY = 4;
 
   // Exporting the same conversation again in a different format is the common
-  // case — someone wants the Markdown and the PDF — and re-downloading every
+  // case (someone wants the Markdown and the PDF), and re-downloading every
   // attachment for it is pure waste. Cached bytes live for the lifetime of the
   // page, capped so a few large conversations cannot pin unbounded memory.
   const CACHE_BYTE_BUDGET = 128 * 1024 * 1024;

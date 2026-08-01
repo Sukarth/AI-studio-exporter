@@ -1,8 +1,8 @@
 /**
  * Normalized conversation model.
  *
- * Both extractors — the API path (src/api/) and the legacy DOM scraper
- * (content.js) — produce this shape, and every formatter consumes it. Adding a
+ * Both extractors (the API path in src/api/ and the legacy DOM scraper
+ * in content.js) produce this shape, and every formatter consumes it. Adding a
  * format means writing one function against this; it never means touching an
  * extractor.
  *
@@ -95,7 +95,7 @@
 
   /**
    * Recompute `stats` from `turns`. Token totals stay null unless at least one
-   * turn reported a count — a zero would imply we measured and got nothing.
+   * turn reported a count; a zero would imply we measured and got nothing.
    */
   function recomputeStats(conversation) {
     const turns = conversation.turns || [];

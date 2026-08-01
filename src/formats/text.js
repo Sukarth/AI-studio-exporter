@@ -1,5 +1,5 @@
 /**
- * Plain-text formatter. No markup, no delimiters that need escaping — just a
+ * Plain-text formatter. No markup, no delimiters that need escaping; just a
  * readable transcript for pasting into things that reject Markdown.
  *
  * @license MIT
@@ -70,7 +70,7 @@
     pro: false,
     // A transcript that names its attachments but does not ship them is not a
     // complete export, and the ZIP is only built when there is something to put
-    // in it — a plain conversation still downloads as a bare .txt.
+    // in it; a plain conversation still downloads as a bare .txt.
     bundlesAssets: true,
     render,
   };

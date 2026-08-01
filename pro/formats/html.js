@@ -1,7 +1,7 @@
 /**
  * Self-contained HTML export.
  *
- * Everything is inlined — CSS, and images as data URIs — so the file opens
+ * Everything is inlined: CSS and images as data URIs. So the file opens
  * anywhere with no network and no adjacent folder. Nothing is loaded from a CDN.
  *
  * Message text is escaped before any markup is added, and the small Markdown
@@ -252,7 +252,7 @@
     if (assetPath) {
       return `<a class="attachment" href="${escapeHtml(encodeURI(assetPath))}">📎 ${name}</a>`;
     }
-    return `<span class="attachment missing">📎 ${name} — not retrievable</span>`;
+    return `<span class="attachment missing">📎 ${name}: not retrievable</span>`;
   }
 
   function render(conversation, settings, assetPaths) {
@@ -341,7 +341,7 @@ ${turns.join('\n')}
   AISE.formats = AISE.formats || {};
   AISE.formats.html = {
     id: 'html',
-    label: 'HTML — self-contained page (.html)',
+    label: 'HTML: self-contained page (.html)',
     extension: 'html',
     mimeType: 'text/html',
     pro: true,

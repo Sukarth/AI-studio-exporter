@@ -3,8 +3,8 @@
  *
  * The trick that makes this possible without a Google account: Playwright
  * fulfils requests to `https://aistudio.google.com/**` itself, so the page has
- * that real origin — which is what decides whether Chrome injects the content
- * scripts — while the body is ours. Google's own endpoints are intercepted the
+ * that real origin (which is what decides whether Chrome injects the content
+ * scripts) while the body is ours. Google's own endpoints are intercepted the
  * same way and answered with canned wire-format payloads, so a full export runs
  * start to finish, offline and deterministic, and the downloaded file is read
  * back off disk and checked.
@@ -15,7 +15,7 @@
  *
  *     npm run test:ui:export
  *
- * Headed only, one launch per process — see the note in test/ui.js.
+ * Headed only, one launch per process; see the note in test/ui.js.
  *
  * @license MIT
  */
@@ -108,6 +108,15 @@ async function test(name, fn) {
     failures.push({ name, error });
     console.log(`  FAIL  ${name}`);
   }
+}
+
+/** The RGBA quad chrome.action reports for a badge state's own colour. */
+function badgeRgba(state) {
+  const source = fs.readFileSync(path.join(ROOT, 'src', 'badge.js'), 'utf8');
+  const block = new RegExp(`\\b${state}: \\{[\\s\\S]*?color: '(#[0-9A-Fa-f]{6})'`).exec(source);
+  if (!block) throw new Error(`no colour declared for badge state ${state}`);
+  const hex = block[1];
+  return [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16)).concat(255);
 }
 
 /** Everything Google would have served, served by us instead. */
@@ -252,7 +261,7 @@ async function main() {
         const [tab] = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
         return chrome.tabs.sendMessage(tab.id, { action: 'getStatus' });
       });
-      assert.deepStrictEqual(status, { isExporting: false });
+      assert.deepStrictEqual(status, { isExporting: false, progress: null });
     });
 
     // --- a real export --------------------------------------------------
@@ -285,21 +294,25 @@ async function main() {
       const heading = await page
         .waitForFunction(
           () => {
-            const h2 = document.querySelector('#ai-studio-export-overlay h2');
-            return h2 ? h2.textContent : null;
+            const title = document.querySelector('#aise-overlay .aise-title');
+            return title ? title.textContent : null;
           },
           { timeout: 15000, polling: 50 }
         )
         .then((handle) => handle.jsonValue());
 
-      assert.strictEqual(heading, 'Exporting Conversation…');
-      // The detail line reserves its height even while empty, so the card does
-      // not resize as stages come and go.
-      const detail = await page.evaluate(() => {
-        const node = document.getElementById('ai-studio-export-progress');
-        return node ? { text: node.textContent, height: node.getBoundingClientRect().height } : null;
+      assert.strictEqual(heading, 'Exporting conversation…');
+      // Every part of the card is present at every stage and has a reserved
+      // height, so the card is the same size throughout.
+      const shape = await page.evaluate(() => {
+        const pick = (sel) => {
+          const node = document.querySelector(sel);
+          return node ? node.getBoundingClientRect().height : null;
+        };
+        return { bar: pick('#aise-overlay .aise-bar'), count: pick('#aise-overlay .aise-count') };
       });
-      assert.ok(detail && detail.height >= 16, JSON.stringify(detail));
+      assert.strictEqual(shape.bar, 4, JSON.stringify(shape));
+      assert.ok(shape.count >= 17, JSON.stringify(shape));
 
       const [download] = await Promise.all([downloaded, running]);
       await download.saveAs(path.join(downloadDir, `heading-${download.suggestedFilename()}`));
@@ -308,7 +321,7 @@ async function main() {
     await test('a finished export shows the green tick on the toolbar', async () => {
       assert.strictEqual(await badgeSettles('✓'), '✓');
       const colour = await worker.evaluate(() => chrome.action.getBadgeBackgroundColor({}));
-      assert.deepStrictEqual(colour, [47, 158, 68, 255], 'green');
+      assert.deepStrictEqual(colour, badgeRgba('done'), 'the green from src/badge.js');
     });
 
     await test('the archive is named after the conversation', async () => {
@@ -363,7 +376,7 @@ async function main() {
     await test('a downgraded format shows the red badge instead', async () => {
       assert.strictEqual(await badgeSettles('X'), 'X');
       const colour = await worker.evaluate(() => chrome.action.getBadgeBackgroundColor({}));
-      assert.deepStrictEqual(colour, [201, 42, 42, 255], 'red');
+      assert.deepStrictEqual(colour, badgeRgba('failed'), 'the red from src/badge.js');
 
       const status = await worker.evaluate(
         () => new Promise((r) => chrome.storage.local.get({ runStatus: null }, (d) => r(d.runStatus)))
@@ -382,11 +395,19 @@ async function main() {
       const popup = await context.newPage();
       await popup.goto(`chrome-extension://${extensionId}/popup.html`);
       await popup.waitForFunction(
-        () => document.getElementById('message').textContent.includes('Pro format'),
+        () => document.getElementById('messageBody').textContent.includes('Pro format'),
         { timeout: 10000 }
       );
-      const className = await popup.evaluate(() => document.getElementById('message').className);
-      assert.match(className, /error/, className);
+      const notice = await popup.evaluate(() => ({
+        tone: document.getElementById('message').className,
+        label: document.getElementById('messageLabel').textContent,
+        action: document.getElementById('messageActionText').textContent,
+      }));
+      // Amber and actionable here, red on the toolbar: 16 pixels can only say
+      // "something is wrong"; the popup has room to say a file still exists.
+      assert.match(notice.tone, /is-warn/, notice.tone);
+      assert.match(notice.label, /wrong format/i, notice.label);
+      assert.match(notice.action, /Unlock Pro/i, notice.action);
       await popup.close();
 
       assert.strictEqual(await badgeSettles(''), '', 'acknowledged, so cleared');
@@ -406,7 +427,7 @@ async function main() {
       assert.strictEqual(result.success, false);
       assert.match(result.message, /Pro licence/);
       // The popup closes as soon as it sends the message, so this reply is
-      // heard by nobody — the badge is the whole of the user-facing answer.
+      // heard by nobody; the badge is the whole of the user-facing answer.
       assert.strictEqual(await badgeSettles('X'), 'X');
     });
 

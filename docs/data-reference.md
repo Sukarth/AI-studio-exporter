@@ -27,7 +27,7 @@ value".
 | --- | --- | --- |
 | `schemaVersion` | number | Currently `1`. |
 | `exporter` | string | Always `"ai-studio-exporter"`. Use it to recognise the file. |
-| `id` | string | The AI Studio prompt id — a bare Drive id, no `prompts/` prefix. |
+| `id` | string | The AI Studio prompt id (a bare Drive id, no `prompts/` prefix). |
 | `title` | string | Conversation title. `"Untitled Conversation"` when AI Studio has none. |
 | `url` | string \| _optional_ | Canonical AI Studio URL. Omitted unless `includeSourceUrl`. |
 | `source` | `"api"` \| `"dom"` | Which extractor produced this. See [source](#source). |
@@ -54,15 +54,15 @@ when that one value was absent.
 
 ### `stats`
 
-Recomputed **after** settings are applied, so it describes what is in the file
-— not what the conversation originally held. Exclude reasoning and
+Recomputed **after** settings are applied, so it describes what is in the file,
+not what the conversation originally held. Exclude reasoning and
 `thoughtTurns` is `0`.
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `turnCount` | number | Total turns in this export. |
 | `userTurns` | number | |
-| `modelTurns` | number | Answers only — excludes reasoning. |
+| `modelTurns` | number | Answers only; excludes reasoning. |
 | `thoughtTurns` | number | Reasoning turns. |
 | `totalTokens` | number \| null | Sum of per-turn counts. `null` if AI Studio reported none. |
 | `attachments` | number | Attachments actually present in the export. |
@@ -88,7 +88,7 @@ Recomputed **after** settings are applied, so it describes what is in the file
 | `mimeType` | string \| undefined | As reported by Drive. |
 | `driveId` | string \| undefined | Drive resource id. Stable; useful for deduplicating across exports. |
 | `byteLength` | number \| undefined | Size of the retrieved file. |
-| `path` | string \| null | Path inside the archive, e.g. `"attachments/screenshot.png"`. **`null` means the bytes could not be fetched** — the record of the attachment is kept, but no file exists. |
+| `path` | string \| null | Path inside the archive, e.g. `"attachments/screenshot.png"`. **`null` means the bytes could not be fetched** (the record of the attachment is kept, but no file exists). |
 
 #### `excludedAttachments`
 
@@ -116,7 +116,7 @@ One JSON object per line. No wrapper array, no trailing comma, `\n`-terminated.
 | `messages[].content` | String. Attachments appear as a leading `[attachment: name]` line, then a blank line, then the message text. |
 
 `system` appears only if the conversation had a system instruction. Note that
-it is included **whenever one exists** — the `includeSystemInstruction` setting
+it is included **whenever one exists**; the `includeSystemInstruction` setting
 strips it upstream, so turning that off removes it here too.
 
 Line-count caveat: **the number of lines is not the number of conversations you
@@ -126,8 +126,8 @@ export's own summary reports what actually landed in the file.
 ### `jsonlIncludeReasoning`
 
 Off by default. When off, reasoning turns are skipped entirely. When on, each
-becomes an `assistant` message and — because it is adjacent to the real answer,
-which is also `assistant` — is merged into it with a blank line between.
+becomes an `assistant` message and (because it is adjacent to the real answer,
+which is also `assistant`) is merged into it with a blank line between.
 
 ---
 
@@ -139,7 +139,7 @@ One row per turn. UTF-8 with a BOM, CRLF line endings, every field quoted.
 | --- | --- |
 | `conversation_id` | AI Studio prompt id. Repeated on every row of the conversation. |
 | `conversation_title` | Repeated on every row. |
-| `turn_index` | 0-based, within this conversation. In a combined library export, indices restart per conversation — group by `conversation_id` before ordering. |
+| `turn_index` | 0-based, within this conversation. In a combined library export, indices restart per conversation; group by `conversation_id` before ordering. |
 | `role` | `user` or `model`. |
 | `is_reasoning` | `true` or `false` as literal text. |
 | `timestamp` | ISO 8601, or empty if unavailable or `includeTimestamps` is off. |
@@ -158,7 +158,7 @@ parsing programmatically and the original value matters.
 A whole-library export to a per-conversation format writes two extra files at
 the root of each archive.
 
-**`index.md`** — a human-readable listing linking to every conversation, plus
+**`index.md`** is a human-readable listing linking to every conversation, plus
 any failures.
 
 **`manifest.json`**:
@@ -205,8 +205,8 @@ any failures.
 | `volume` / `volumeCount` | Archives are split near 256 MB. See [what you download](archives.md#large-libraries). |
 | `library` | **Every** conversation in the export, wherever it ended up. Present even when there is only one archive, so a consumer never has to special-case that. |
 | `conversations` | Only what this archive holds. `path` resolves inside it; a path from `library` may not. |
-| `*.volume` | Which part holds that conversation — always `1` when the export was not split. |
-| `*.modifiedAt` | Epoch **milliseconds** here, not ISO — this file is written by the batch layer, not the JSON formatter. |
+| `*.volume` | Which part holds that conversation (always `1` when the export was not split). |
+| `*.modifiedAt` | Epoch **milliseconds** here, not ISO (this file is written by the batch layer, not the JSON formatter). |
 | `failures` | `[{id, title, error}]`. Repeated in every part: a failure list that exists in one archive out of three is one most people never see. |
 
 ---
@@ -215,10 +215,10 @@ any failures.
 
 ### `source`
 
-`"api"` — read from AI Studio's own backend. Full fidelity: token counts,
+`"api"` is read from AI Studio's own backend. Full fidelity: token counts,
 timestamps, model configuration, system instruction, and attachment bytes.
 
-`"dom"` — scraped from the rendered page, used when the API path is
+`"dom"` is scraped from the rendered page, used when the API path is
 unavailable. Only what the page displays: no token counts, no model config, no
 system instruction, and attachments limited to what was rendered. If fields are
 missing across the board, check this first.
@@ -227,12 +227,12 @@ missing across the board, check this first.
 
 Marks a model turn as reasoning rather than the answer. Reasoning is a sibling
 of the answer in the turn list, not a child of it, because that is how AI Studio
-stores it — so a question typically produces two `model` turns in sequence, the
+stores it. A question typically produces two `model` turns in sequence, the
 first with `isThought: true`.
 
 ### Token counts
 
-AI Studio's own numbers, passed through unmodified — not a re-count, and not
+AI Studio's own numbers, passed through unmodified; they are not a re-count, and not
 comparable to a tokenizer you run yourself. A turn with no reported count is
 `null`, never `0`.
 

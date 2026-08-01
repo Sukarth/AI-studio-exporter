@@ -93,7 +93,7 @@
       const tab = await chrome.tabs.create({ url: BACKUP_URL, active: false });
       return { tabId: tab.id, opened: true, windowId: null };
     } catch (error) {
-      // Thrown when there is no window to put a tab in — Chrome still running
+      // Thrown when there is no window to put a tab in; Chrome still running
       // with every window closed, which on macOS is an ordinary state and on
       // any platform is what a backup scheduled overnight tends to find.
       const window = await chrome.windows.create({
@@ -111,8 +111,8 @@
    * Poll until the content script answers, so we never message a blank tab.
    *
    * Also watches for the tab leaving AI Studio. A profile that is signed out
-   * of Google — or whose session has expired, which is what an unattended
-   * backup eventually meets — is redirected to a sign-in page, where nothing
+   * of Google, or whose session has expired (which is what an unattended
+   * backup eventually meets), is redirected to a sign-in page, where nothing
    * of ours runs. Waiting the full timeout and then reporting that AI Studio
    * "did not finish loading" is both slow and wrong.
    *
@@ -198,14 +198,14 @@
     } catch (error) {
       const message = error && error.message ? error.message : String(error);
       await writeState(Object.assign({}, state, { lastRunAt: Date.now(), lastResult: `Failed: ${message}` }));
-      // Everything that fails here fails before the content script runs — no
-      // tab, no sign-in, a redirect — so nothing else has badged it, and an
+      // Everything that fails here fails before the content script runs; no
+      // tab, no sign-in, a redirect. So nothing else has badged it, and an
       // unattended backup that silently stops is a backup nobody has.
       if (AISE.badge) await AISE.badge.set('failed', `Scheduled backup: ${message}`);
       return { success: false, message };
     } finally {
       // Leave anything the user already had open exactly as it was, and clear
-      // up whatever this run opened — including the window, when there was no
+      // up whatever this run opened, including the window, when there was no
       // window to borrow.
       if (openedWindowId !== null) {
         try { await chrome.windows.remove(openedWindowId); } catch (_) { /* already gone */ }

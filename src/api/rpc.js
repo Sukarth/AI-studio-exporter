@@ -13,7 +13,7 @@
  *     Attachments in a conversation are bare Drive ids; this is how they become
  *     real filenames and bytes.
  *
- * Nothing here is reachable from the page's own code — it only acts on messages
+ * Nothing here is reachable from the page's own code; it only acts on messages
  * that came from our isolated-world bridge (same window, same origin, correct
  * tag), and every outbound request is a read against an allowlisted host.
  *
@@ -197,7 +197,7 @@
   async function driveFetch(url) {
     const response = await fetch(url, { headers: { authorization: `Bearer ${await getAccessToken()}` } });
     if (response.status === 401) {
-      // Token went stale earlier than expected — drop it and try once more.
+      // Token went stale earlier than expected; drop it and try once more.
       tokenCache = null;
       return fetch(url, { headers: { authorization: `Bearer ${await getAccessToken()}` } });
     }
