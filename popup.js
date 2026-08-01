@@ -26,10 +26,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isPro = false;
   let onPromptPage = false;
 
-  const showMessage = (type, text) => {
+  const showMessage = (type, text, label) => {
     el.message.className = `message ${type}`;
-    el.message.textContent = text;
+    el.message.textContent = '';
+    if (label) {
+      const tag = document.createElement('span');
+      tag.className = 'label';
+      tag.textContent = label;
+      el.message.appendChild(tag);
+    }
+    el.message.appendChild(document.createTextNode(text));
   };
+
+  /**
+   * Report on the export that ran while the popup was closed.
+   *
+   * The popup closes itself the moment it starts one — it is destroyed on blur
+   * regardless — so this is the only place a result is ever read. Opening the
+   * popup is also the acknowledgement that clears a sticky toolbar badge.
+   */
+  async function showLastRun() {
+    let status = null;
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'status:seen' });
+      status = response && response.status;
+    } catch (_) {
+      // Service worker unreachable; nothing to report.
+    }
+    if (!status || !status.text || status.state === 'idle') return;
+    if (status.state === 'running' || status.state === 'reading') return;
+
+    const label = { done: 'Last export', partial: 'Last export — check this', failed: 'Last export failed' }[
+      status.state
+    ];
+    showMessage(AISE.badge.toneFor(status.state), status.text, label);
+  }
 
   el.version.textContent = `v${chrome.runtime.getManifest().version}`;
 
@@ -191,4 +222,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderFormats(stored.defaultFormat);
 
   await refresh();
+  await showLastRun();
 });

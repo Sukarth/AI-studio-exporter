@@ -31,7 +31,7 @@
 
   // --- progress overlay ---------------------------------------------------
 
-  function showLoadingOverlay() {
+  function showLoadingOverlay(heading) {
     if (document.getElementById('ai-studio-export-overlay')) return;
 
     if (!document.getElementById('ai-studio-export-style')) {
@@ -60,6 +60,9 @@
         #ai-studio-export-progress {
           margin:24px 0 20px; padding-top:24px; border-top:1px solid #2c2e33;
           color:#667eea; font-size:13px; font-weight:600;
+          /* Reserve the line whether or not a stage supplies a detail, so the
+             card does not grow and shrink as stages come and go. */
+          line-height:16px; min-height:16px;
         }
         #ai-studio-export-cancel {
           background:transparent; border:1px solid #c92a2a; color:#ff8787;
@@ -71,16 +74,25 @@
       document.head.appendChild(style);
     }
 
+    const title = heading || 'Exporting Conversation';
     const overlay = document.createElement('div');
     overlay.id = 'ai-studio-export-overlay';
-    overlay.innerHTML = `
-      <div class="aise-card" role="dialog" aria-live="polite" aria-label="Exporting conversation">
+    // Built as nodes rather than innerHTML because the heading is now a
+    // parameter, and a template that interpolates one is a template someone
+    // will eventually pass user text to.
+    const card = document.createElement('div');
+    card.className = 'aise-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-live', 'polite');
+    card.setAttribute('aria-label', title);
+    card.innerHTML = `
         <div class="aise-spinner"></div>
-        <h2>Exporting Conversation…</h2>
+        <h2></h2>
         <p id="ai-studio-export-status">Starting…</p>
         <div id="ai-studio-export-progress"></div>
-        <button id="ai-studio-export-cancel" type="button">Cancel Export</button>
-      </div>`;
+        <button id="ai-studio-export-cancel" type="button">Cancel Export</button>`;
+    card.querySelector('h2').textContent = `${title}…`;
+    overlay.appendChild(card);
 
     // Swallow interaction so a stray click can't disturb the page mid-export.
     for (const type of ['mousedown', 'mouseup', 'click', 'keydown', 'keyup']) {
@@ -375,23 +387,43 @@
   }
 
   /**
+   * Set the toolbar badge. Content scripts cannot reach chrome.action, so the
+   * service worker does it; failures are ignored because a badge that could
+   * not be painted must never take an export down with it.
+   */
+  const setBadge = (state, text) => {
+    try {
+      chrome.runtime.sendMessage({ action: 'status:set', state, text }, () => chrome.runtime.lastError);
+    } catch (_) {
+      // Extension context invalidated — the export is about to fail anyway.
+    }
+  };
+
+  /**
    * Shared wrapper for both export kinds: one at a time, overlay up, overlay
    * always torn down. `silent` suppresses the overlay for scheduled backups,
-   * which run in a background tab the user is not looking at.
+   * which run in a background tab the user is not looking at — the badge is
+   * deliberately not suppressed, because it is the only way an unattended
+   * backup can report that it failed.
    */
   async function runExport(request, work) {
     if (isExporting) return { success: false, message: 'An export is already running' };
 
+    const library = request.action === 'exportLibrary';
     isExporting = true;
     shouldCancel = false;
-    if (!request.silent) showLoadingOverlay();
+    if (!request.silent) showLoadingOverlay(library ? 'Exporting Library' : 'Exporting Conversation');
+    setBadge('running');
 
+    let downgraded = false;
     try {
       const settings = await getSettings();
       CONFIG.ELEMENT_LOAD_DELAY = settings.loadDelay;
 
       const requested = request.formatId || request.format || settings.defaultFormat || 'markdown';
-      const { format, downgraded, reason } = await AISE.license.resolveFormat(requested);
+      const resolved = await AISE.license.resolveFormat(requested);
+      const { format, reason } = resolved;
+      downgraded = resolved.downgraded;
       if (downgraded && !request.silent) updateLoadingStatus(reason);
 
       const result = await work({
@@ -399,15 +431,21 @@
         formatId: format.id,
         report: request.silent ? () => {} : (message, progress) => updateLoadingStatus(message, progress),
         shouldCancel: () => shouldCancel,
+        // Fires the moment the API path is abandoned, so the badge can say so
+        // while the slow part is still running rather than only afterwards.
+        onSource: (source) => setBadge(source === 'dom' ? 'reading' : 'running'),
       });
 
       if (downgraded && result && result.success) {
         result.message = `${result.message} · ${reason}`;
       }
+      setBadge(AISE.badge.outcomeFor(result, downgraded), result && result.message);
       return result;
     } catch (error) {
       console.error('[AI Studio Exporter] Export failed:', error);
-      return { success: false, message: error && error.message ? error.message : String(error) };
+      const message = error && error.message ? error.message : String(error);
+      setBadge('failed', message);
+      return { success: false, message };
     } finally {
       isExporting = false;
       shouldCancel = false;
@@ -425,7 +463,11 @@
    */
   async function runLibraryExport(request) {
     if (!(await AISE.license.isPro({ skipRevalidation: true }))) {
-      return { success: false, message: 'Library export requires a Pro licence.' };
+      // Badged rather than merely returned: the popup closes the moment it
+      // sends this message, so nothing is listening for the reply.
+      const message = 'Library export requires a Pro licence.';
+      setBadge('failed', message);
+      return { success: false, message };
     }
     return runExport(request, (options) =>
       AISE.batch.exportLibrary(Object.assign({ filters: request.filters || {} }, options))

@@ -135,12 +135,19 @@
   /**
    * Acquire a conversation, preferring the API.
    * @param {(stage: string, detail?: string) => void} report
+   * @param {(source: 'api'|'dom') => void} [onSource] - fires once the path is
+   *   settled, so a caller can say which one is running while it still is
    */
-  async function acquireConversation(promptId, settings, report, shouldCancel) {
+  async function acquireConversation(promptId, settings, report, shouldCancel, onSource) {
+    const announce = (source) => {
+      if (typeof onSource === 'function') onSource(source);
+    };
+
     if (promptId && AISE.api) {
       try {
         report('Reading conversation via AI Studio API…');
         const conversation = await AISE.api.fetchConversation(promptId);
+        announce('api');
 
         if (settings.scrapeAttachments || settings.scrapeImages) {
           const pending = conversation.turns.flatMap((t) => t.parts).filter((p) => p.driveId).length;
@@ -168,6 +175,7 @@
     if (typeof AISE.domExtract !== 'function') {
       throw new Error('Could not read this conversation via the API, and no fallback is available.');
     }
+    announce('dom');
     return AISE.domExtract(settings, report, shouldCancel);
   }
 
@@ -176,11 +184,11 @@
    * @returns {Promise<{success: boolean, message: string, filename?: string}>}
    */
   async function exportConversation(options) {
-    const { settings, formatId, report, shouldCancel } = options;
+    const { settings, formatId, report, shouldCancel, onSource } = options;
     const format = AISE.formats[formatId] || AISE.formats.markdown;
 
     const promptId = currentPromptId();
-    const conversation = await acquireConversation(promptId, settings, report, shouldCancel);
+    const conversation = await acquireConversation(promptId, settings, report, shouldCancel, onSource);
 
     if (shouldCancel && shouldCancel()) throw new Error('Export cancelled');
     if (!conversation.turns.length) {
@@ -210,7 +218,17 @@
     if (failed) parts.push(`${failed} attachment${failed === 1 ? '' : 's'} unavailable`);
     if (conversation.source === 'dom') parts.push('reduced fidelity (page scraping)');
 
-    return { success: true, message: parts.join(' · '), filename, warning };
+    // `source` and `attachmentFailures` are repeated as fields rather than
+    // left inside the message: the badge has to grade the outcome, and
+    // grading it by grepping a sentence is how sentences become load-bearing.
+    return {
+      success: true,
+      message: parts.join(' · '),
+      filename,
+      warning,
+      source: conversation.source,
+      attachmentFailures: failed,
+    };
   }
 
   AISE.exporter = {

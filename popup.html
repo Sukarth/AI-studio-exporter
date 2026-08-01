@@ -148,6 +148,16 @@
     .message.success { background: rgba(43, 138, 62, .15); color: #69db7c; border: 1px solid rgba(43, 138, 62, .3); display: block; }
     .message.error { background: rgba(201, 42, 42, .15); color: #ff8787; border: 1px solid rgba(201, 42, 42, .3); display: block; }
     .message.info { background: rgba(102, 126, 234, .12); color: #a5b4fc; border: 1px solid rgba(102, 126, 234, .3); display: block; }
+    .message.warn { background: rgba(178, 106, 0, .16); color: #ffc078; border: 1px solid rgba(178, 106, 0, .4); display: block; }
+
+    .message .label {
+      display: block;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      opacity: .75;
+      margin-bottom: 2px;
+    }
 
     .spinner {
       display: inline-block;
@@ -221,6 +231,7 @@
   </div>
 
   <script src="settings.js"></script>
+  <script src="src/badge.js"></script>
   <script src="pro/license.js"></script>
   <script src="popup.js"></script>
 </body>

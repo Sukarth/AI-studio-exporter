@@ -198,6 +198,10 @@
     } catch (error) {
       const message = error && error.message ? error.message : String(error);
       await writeState(Object.assign({}, state, { lastRunAt: Date.now(), lastResult: `Failed: ${message}` }));
+      // Everything that fails here fails before the content script runs — no
+      // tab, no sign-in, a redirect — so nothing else has badged it, and an
+      // unattended backup that silently stops is a backup nobody has.
+      if (AISE.badge) await AISE.badge.set('failed', `Scheduled backup: ${message}`);
       return { success: false, message };
     } finally {
       // Leave anything the user already had open exactly as it was, and clear

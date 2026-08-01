@@ -4,14 +4,15 @@
   "description": "Chrome extension to export conversations from Google AI Studio with media attachments",
   "main": "background.js",
   "scripts": {
-    "test": "node test/run.js && node test/attachments.js && node test/license.js && node test/batch.js && node test/documents.js",
+    "test": "node test/run.js && node test/attachments.js && node test/license.js && node test/batch.js && node test/documents.js && node test/badge.js",
     "build": "node build.js",
     "build:watch": "node build.js --watch",
     "test:core": "node test/run.js",
     "test:ui": "node test/ui.js",
     "test:ui:export": "node test/ui-export.js",
     "test:all": "npm test && npm run test:ui && npm run test:ui:export && npm run test:ui:alarm",
-    "test:ui:alarm": "node test/ui-alarm.js"
+    "test:ui:alarm": "node test/ui-alarm.js",
+    "test:badge": "node test/badge.js"
   },
   "keywords": [
     "chrome-extension",

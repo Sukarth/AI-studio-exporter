@@ -127,6 +127,15 @@ async function installRoutes(context, seen) {
     const method = route.request().url().split('/').pop();
     seen.rpc.push(method);
 
+    // A hook for tests that need to look at the page mid-export. Everything
+    // here answers instantly otherwise, which makes the progress overlay a
+    // few frames long and impossible to catch.
+    if (seen.stallMs) {
+      const ms = seen.stallMs;
+      seen.stallMs = 0;
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
     if (method === 'ResolveDriveResource') {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(wirePrompt()) });
     }
@@ -174,7 +183,7 @@ async function main() {
     if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 20000 });
     const extensionId = new URL(worker.url()).host;
 
-    const seen = { rpc: [], metadata: [], downloads: [] };
+    const seen = { rpc: [], metadata: [], downloads: [], stallMs: 0 };
     await installRoutes(context, seen);
 
     // The transport derives a SAPISIDHASH from this and refuses to run without
@@ -209,6 +218,23 @@ async function main() {
       return { result, file: target, name: download.suggestedFilename(), freshDownloads: seen.downloads.length - before };
     }
 
+    /**
+     * The badge is painted by the service worker in response to a message from
+     * the content script, so it lands a moment after the export resolves.
+     * Polling for the expected value keeps the assertion honest either way: a
+     * badge that never arrives still fails, it just takes a second to do it.
+     */
+    async function badgeSettles(expected, timeoutMs = 5000) {
+      const deadline = Date.now() + timeoutMs;
+      let text = null;
+      while (Date.now() < deadline) {
+        text = await worker.evaluate(() => chrome.action.getBadgeText({}));
+        if (text === expected) return text;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return text;
+    }
+
     // --- injection ------------------------------------------------------
 
     await test('content scripts inject on an AI Studio page', async () => {
@@ -237,6 +263,52 @@ async function main() {
       markdown = await exportAs('markdown');
       assert.strictEqual(markdown.result.success, true, markdown.result.message);
       assert.ok(seen.rpc.includes('ResolveDriveResource'), 'the API was actually used');
+    });
+
+    await test('the overlay names what it is exporting', async () => {
+      // The listener has to exist before the export does: with a mocked
+      // network and cached attachments the whole thing can finish before an
+      // await on the next line gets a chance to run.
+      const downloaded = context.waitForEvent('download', { timeout: 60000 });
+      downloaded.catch(() => {});
+
+      // Hold the first RPC call so the overlay is on screen long enough to
+      // read. Without it the export is over in a couple of frames.
+      seen.stallMs = 2000;
+
+      // Started rather than awaited: the overlay only exists while the export
+      // is in flight, and it tears itself down in a finally.
+      const running = worker.evaluate(async () => {
+        const [tab] = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
+        return chrome.tabs.sendMessage(tab.id, { action: 'export', formatId: 'text' });
+      });
+      const heading = await page
+        .waitForFunction(
+          () => {
+            const h2 = document.querySelector('#ai-studio-export-overlay h2');
+            return h2 ? h2.textContent : null;
+          },
+          { timeout: 15000, polling: 50 }
+        )
+        .then((handle) => handle.jsonValue());
+
+      assert.strictEqual(heading, 'Exporting Conversation…');
+      // The detail line reserves its height even while empty, so the card does
+      // not resize as stages come and go.
+      const detail = await page.evaluate(() => {
+        const node = document.getElementById('ai-studio-export-progress');
+        return node ? { text: node.textContent, height: node.getBoundingClientRect().height } : null;
+      });
+      assert.ok(detail && detail.height >= 16, JSON.stringify(detail));
+
+      const [download] = await Promise.all([downloaded, running]);
+      await download.saveAs(path.join(downloadDir, `heading-${download.suggestedFilename()}`));
+    });
+
+    await test('a finished export shows the green tick on the toolbar', async () => {
+      assert.strictEqual(await badgeSettles('✓'), '✓');
+      const colour = await worker.evaluate(() => chrome.action.getBadgeBackgroundColor({}));
+      assert.deepStrictEqual(colour, [47, 158, 68, 255], 'green');
     });
 
     await test('the archive is named after the conversation', async () => {
@@ -288,6 +360,44 @@ async function main() {
       assert.ok(pdf.name.endsWith('.zip'));
     });
 
+    await test('a downgraded format shows the red badge instead', async () => {
+      assert.strictEqual(await badgeSettles('X'), 'X');
+      const colour = await worker.evaluate(() => chrome.action.getBadgeBackgroundColor({}));
+      assert.deepStrictEqual(colour, [201, 42, 42, 255], 'red');
+
+      const status = await worker.evaluate(
+        () => new Promise((r) => chrome.storage.local.get({ runStatus: null }, (d) => r(d.runStatus)))
+      );
+      assert.strictEqual(status.state, 'failed');
+      assert.match(status.text, /Pro format/, status.text);
+      assert.strictEqual(status.seen, false, 'a red badge waits to be acknowledged');
+    });
+
+    await test('the red badge survives a service worker restart', async () => {
+      await worker.evaluate(() => globalThis.AISE.badge.restore());
+      assert.strictEqual(await worker.evaluate(() => chrome.action.getBadgeText({})), 'X');
+    });
+
+    await test('opening the popup explains the badge and clears it', async () => {
+      const popup = await context.newPage();
+      await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+      await popup.waitForFunction(
+        () => document.getElementById('message').textContent.includes('Pro format'),
+        { timeout: 10000 }
+      );
+      const className = await popup.evaluate(() => document.getElementById('message').className);
+      assert.match(className, /error/, className);
+      await popup.close();
+
+      assert.strictEqual(await badgeSettles(''), '', 'acknowledged, so cleared');
+      await worker.evaluate(() => globalThis.AISE.badge.restore());
+      assert.strictEqual(
+        await worker.evaluate(() => chrome.action.getBadgeText({})),
+        '',
+        'and it does not come back'
+      );
+    });
+
     await test('library export is refused without a licence', async () => {
       const result = await worker.evaluate(async () => {
         const [tab] = await chrome.tabs.query({ url: 'https://aistudio.google.com/*' });
@@ -295,6 +405,9 @@ async function main() {
       });
       assert.strictEqual(result.success, false);
       assert.match(result.message, /Pro licence/);
+      // The popup closes as soon as it sends the message, so this reply is
+      // heard by nobody — the badge is the whole of the user-facing answer.
+      assert.strictEqual(await badgeSettles('X'), 'X');
     });
 
     await test('an unknown action is rejected', async () => {

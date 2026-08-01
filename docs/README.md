@@ -9,6 +9,7 @@ change the output.
 | [Data reference](data-reference.md) | Parsing a JSON, JSONL or CSV export in code |
 | [What you download](archives.md) | Working out where the files inside a `.zip` came from |
 | [Settings](settings.md) | A field is missing and you want to know which toggle removed it |
+| [Toolbar badge](badges.md) | There is a mark on the extension icon and you want to know what it means |
 
 ## Pick a format in ten seconds
 

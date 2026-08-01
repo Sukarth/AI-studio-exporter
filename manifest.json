@@ -53,6 +53,7 @@
       ],
       "js": [
         "settings.js",
+        "src/badge.js",
         "libs/jszip.min.js",
         "src/model.js",
         "src/api/decode.js",
