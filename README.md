@@ -1,4 +1,4 @@
-# 📦 AI Studio Exporter
+# AI Studio Exporter
 
 **The 100% open source Google AI Studio exporter.** Every line of it, including the paid features, is in this repository under the MIT licence.
 
@@ -6,7 +6,7 @@ Export any AI Studio conversation, or your entire library, complete with attachm
 
 ![Demo of AI Studio Exporter](https://raw.githubusercontent.com/Sukarth/AI-studio-exporter/main/images/Demo.gif)
 
-## ✨ What it does
+## What it does
 
 - **Exports the whole conversation**, not just what is on screen; there is no scrolling, no lazy-loading gaps.
 - **Real attachments.** Files are fetched from Drive at full fidelity rather than saved as page thumbnails. Google Docs, Sheets and Slides are converted on the way out, and only the types you asked for are downloaded at all.
@@ -18,7 +18,7 @@ Export any AI Studio conversation, or your entire library, complete with attachm
 
 Version 2 talks to AI Studio's own API instead of scraping the page. A 200-message conversation used to take about two and a half minutes of automated scrolling; it now takes under a second. If the API is ever unavailable, the old page-scraping path is still there as a fallback.
 
-## 💾 Formats
+## Formats
 
 | Format | | |
 |---|---|---|
@@ -34,7 +34,7 @@ Version 2 talks to AI Studio's own API instead of scraping the page. A 200-messa
 
 **[Format documentation →](docs/README.md)** covers what each format contains, every field in the JSON, JSONL and CSV exports, what lands in a `.zip`, and which setting removes what.
 
-## 💎 Pro
+## Pro
 
 A one-time payment. No subscription, no account, and the code stays open.
 
@@ -55,7 +55,7 @@ To be completely straightforward about how the licence check works, since you ca
 
 If you are going to remove the check, you may as well [open an issue](https://github.com/Sukarth/AI-studio-exporter/issues) about what you actually needed instead.
 
-## 🚀 Installation
+## Installation
 
 Chrome Web Store listing is on the way. Until then:
 
@@ -87,7 +87,7 @@ git pull origin main
 # then hit the reload icon on the extension's card in chrome://extensions/
 ```
 
-## 📖 Usage
+## Usage
 
 1. Open a conversation on [AI Studio](https://aistudio.google.com/).
 2. Click the extension icon.
@@ -95,7 +95,7 @@ git pull origin main
 
 For the whole library, click **Export Entire Library** instead. Settings, including what to include, default format, and backup schedule, live behind the gear icon.
 
-## 📂 What you get
+## What you get
 
 A single conversation with attachments:
 
@@ -124,14 +124,14 @@ ai-studio-library-2026-07-29T14-30-00.zip
 
 CSV and JSONL exports skip the folder structure and produce one dataset file for the whole library.
 
-## 🔒 Privacy
+## Privacy
 
 - Conversations are read, formatted and downloaded entirely inside your browser.
 - Attachments are fetched directly from Google with your existing session. They do not pass through anything of ours.
 - Settings sync with your Chrome profile; they contain no conversation content.
 - The one exception, stated plainly: activating a Pro licence sends the key to Polar once. Nothing else is sent, and it is never sent again.
 
-## 🛠️ How it works
+## How it works
 
 - **API first.** `src/api/` speaks AI Studio's own RPC interface. Because those endpoints are CORS-locked to the AI Studio origin, the transport (`src/api/rpc.js`) runs in the page's MAIN world and is reached over `postMessage`; everything else stays in the isolated world.
 - **One model, many writers.** Both the API path and the DOM fallback produce the same normalised conversation object (`src/model.js`), so a formatter never needs to know where the data came from.
@@ -148,21 +148,21 @@ CSV and JSONL exports skip the folder structure and produce one dataset file for
 | `alarms` | Scheduled backups |
 | `host_permissions` | `aistudio.google.com`, and `api.polar.sh` for the one-time licence check |
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 - **"Reload the AI Studio page, then try again"** means the content script has not been injected, usually right after installing or updating the extension. Refresh the tab.
 - **Export is slow, or the reasoning looks wrong** indicates the extension fell back to page scraping. Check the browser console (F12) for the reason and please open an issue; the API path should be handling it.
 - **Nothing happens when you click Export**: check that the page is a conversation (`aistudio.google.com/prompts/…`) rather than the library index.
 - **A few conversations failed in a library export** means the run continues past failures on purpose. `manifest.json` in the archive names each one and why.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome, from bug reports to pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md), which covers the layout, how to run the tests (`npm test`, no dependencies needed) and how to rebuild the document bundle.
 
-## 📝 License
+## License
 
 MIT. See [LICENSE](LICENSE), and [THIRD-PARTY.md](THIRD-PARTY.md) for the bundled libraries.
 
 ---
 
-**Made with ❤️ by Sukarth Acharya**
+Built by [Sukarth Acharya](https://github.com/Sukarth).

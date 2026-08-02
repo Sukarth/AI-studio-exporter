@@ -31,27 +31,27 @@ Each turn is preceded by an HTML comment delimiter:
 
 ```markdown
 <!-- aise:turn role=user -->
-## 👤 User
+## User
 
 _2025-06-15 12:20:00 UTC · 18 tokens_
 
 How does the RPC auth work?
 
 <!-- aise:turn role=model thought=1 -->
-## 🧠 Model (Reasoning)
+## Model (Reasoning)
 
 ...
 ```
 
 The comments render as nothing but give tooling an unambiguous turn boundary.
-That matters because message text can contain `## 👤 User` itself; it cannot
+That matters because message text can contain `## User` itself; it cannot
 easily contain the delimiter by accident.
 
 Attachments become links, images become embeds:
 
 ```markdown
 ![screenshot.png](attachments/screenshot.png)
-📎 [network-log.har](attachments/network-log.har) _(1.4 MB)_
+**Attachment:** [network-log.har](attachments/network-log.har) _(1.4 MB)_
 ```
 
 Link targets are percent-encoded, including `(`, `)`, `#` and `?`. A
@@ -182,7 +182,7 @@ tags: [ai-studio, conversation]
 filename rather than by path, so the files work once they are anywhere in the
 vault.
 
-**Collapsible callouts** for reasoning (`> [!note]- 🧠 Reasoning`) and for the
+**Collapsible callouts** for reasoning (`> [!note]- Reasoning`) and for the
 system instruction, both collapsed by default.
 
 Field meanings match [data reference](data-reference.md#json); the keys are

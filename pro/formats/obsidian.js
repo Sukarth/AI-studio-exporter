@@ -60,7 +60,7 @@
     // Wikilinks resolve by vault filename, so link the basename rather than the
     // archive-relative path.
     const basename = assetPath.split('/').pop();
-    return part.type === 'image' ? `![[${basename}]]` : `📎 [[${basename}]]`;
+    return part.type === 'image' ? `![[${basename}]]` : `**Attachment:** [[${basename}]]`;
   }
 
   function render(conversation, settings, assetPaths) {
@@ -75,12 +75,12 @@
     for (const turn of conversation.turns) {
       if (turn.isThought) {
         // Collapsed by default: reasoning is usually longer than the answer.
-        out.push('> [!note]- 🧠 Reasoning');
+        out.push('> [!note]- Reasoning');
         out.push('> ' + turn.text.split('\n').join('\n> '), '');
         continue;
       }
 
-      out.push(turn.role === 'user' ? '## 👤 User' : '## 🤖 Model');
+      out.push(turn.role === 'user' ? '## User' : '## Model');
 
       const meta = [];
       if (settings.includeTimestamps && turn.timestamp) meta.push(new Date(turn.timestamp).toISOString());

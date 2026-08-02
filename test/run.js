@@ -346,15 +346,15 @@ test('markdown includes metadata and unambiguous turn delimiters', () => {
   assert.ok(md.includes('**Temperature:** 1'));
   assert.ok(md.includes('**Top P:** 0.95'));
   assert.ok(md.includes('<!-- aise:turn role=model thought=1 -->'));
-  assert.ok(md.includes('## 🧠 Model (Reasoning)'));
+  assert.ok(md.includes('## Model (Reasoning)'));
   assert.ok(md.includes('It is 4.'));
 });
 
 test('markdown does not mangle message bodies that look like our own markup', () => {
   const c = AISE.decode.decodeConversation(wirePrompt());
-  c.turns[0].text = '## 👤 User\n---\nnot a real heading';
+  c.turns[0].text = '## User\n---\nnot a real heading';
   const md = AISE.formats.markdown.render(c, ALL_ON, new Map());
-  assert.ok(md.includes('## 👤 User\n---\nnot a real heading'), 'body preserved verbatim');
+  assert.ok(md.includes('## User\n---\nnot a real heading'), 'body preserved verbatim');
   // Delimiter count is what disambiguates, not escaping.
   assert.strictEqual((md.match(/<!-- aise:turn/g) || []).length, c.turns.length);
 });
@@ -792,7 +792,7 @@ test('obsidian frontmatter survives a title containing quotes', () => {
 test('obsidian wraps reasoning in a collapsed callout', () => {
   const c = AISE.decode.decodeConversation(wirePrompt());
   const md = AISE.formats.obsidian.render(c, ALL_ON, new Map());
-  assert.ok(md.includes('> [!note]- 🧠 Reasoning'));
+  assert.ok(md.includes('> [!note]- Reasoning'));
 });
 
 test('obsidian links attachments by vault basename, not archive path', () => {

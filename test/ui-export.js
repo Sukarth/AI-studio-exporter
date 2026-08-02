@@ -345,7 +345,7 @@ async function main() {
       const md = await zip.files['conversation.md'].async('string');
       assert.ok(md.includes('# Playwright Fixture Chat'));
       assert.ok(md.includes('A picture and a document.'), 'the answer is present');
-      assert.ok(md.includes('## 🧠 Model (Reasoning)'), 'and reasoning is its own message');
+      assert.ok(md.includes('## Model (Reasoning)'), 'and reasoning is its own message');
       assert.ok(md.includes('![diagram.png](attachments/diagram.png)'), 'the image is linked');
     });
 

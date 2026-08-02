@@ -195,9 +195,14 @@
     .turn.user { background:var(--user); }
     .turn.model { background:var(--model); }
     .turn.thought { background:var(--thought); }
-    .turn header { display:flex; gap:.75rem; align-items:baseline; margin-bottom:.5rem;
+    .turn header { display:flex; gap:.75rem; align-items:center; margin-bottom:.5rem;
       font-weight:600; font-size:.9rem; }
     .turn header .sub { font-weight:400; color:var(--muted); font-size:.8rem; }
+    .label { display:inline-flex; align-items:center; gap:.45rem; }
+    /* Icons inherit text colour, so they follow the reader's dark mode without
+       a second set of rules. */
+    .ico { width:1.05em; height:1.05em; flex:0 0 auto; fill:none; stroke:currentColor;
+      stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
     .turn :first-child { margin-top:0; }
     .turn :last-child { margin-bottom:0; }
     /* A single unbroken line - an ASCII table, a long URL - must not push the
@@ -221,7 +226,8 @@
        are long, which they usually are. */
     .attachments { display:flex; flex-direction:column; align-items:flex-start; gap:.35rem;
       margin:0 0 .75rem; }
-    .attachment { display:block; max-width:100%; padding:.4rem .7rem; border:1px solid var(--line);
+    .attachment { display:flex; align-items:center; gap:.45rem; max-width:100%;
+      padding:.4rem .7rem; border:1px solid var(--line);
       border-radius:8px; font-size:.85rem; overflow-wrap:anywhere; }
     .attachment.missing { opacity:.65; font-style:italic; }
     /* Reasoning is collapsed by default: it is usually far longer than the
@@ -229,7 +235,7 @@
     details.thought { border:1px solid var(--line); border-radius:12px; background:var(--thought);
       margin-bottom:1rem; }
     details.thought > summary { cursor:pointer; padding:1rem 1.25rem; font-weight:600;
-      font-size:.9rem; list-style:none; display:flex; gap:.75rem; align-items:baseline; }
+      font-size:.9rem; list-style:none; display:flex; gap:.75rem; align-items:center; }
     details.thought > summary::-webkit-details-marker { display:none; }
     details.thought > summary::before { content:'▸'; color:var(--muted); }
     details.thought[open] > summary::before { content:'▾'; }
@@ -241,6 +247,24 @@
     @media print { body { padding:0; } .turn { break-inside:avoid; border-color:#ccc; background:none; } }
   `;
 
+  /**
+   * Role and attachment icons.
+   *
+   * Defined once as symbols and referenced with <use>, so a 400-message
+   * conversation carries one copy of each path rather than four hundred. Drawn
+   * with currentColor so they inherit whatever the surrounding text is, which
+   * includes the reader's dark mode.
+   */
+  const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
+<symbol id="i-model" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M9 13v2"/><path d="M15 13v2"/></symbol>
+<symbol id="i-thought" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5A5.7 5.7 0 0 0 18 8a6 6 0 0 0-12 0c0 1.2.4 2.4 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
+<symbol id="i-system" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.4 11-9.2 9.2a6 6 0 0 1-8.5-8.5l8.6-8.5A4 4 0 1 1 18 8.8l-8.6 8.6a2 2 0 0 1-2.8-2.9l8.5-8.4"/></symbol>
+</defs></svg>`;
+
+  const icon = (id) => `<svg class="ico" aria-hidden="true"><use href="#i-${id}"></use></svg>`;
+
   const fmtDate = (ms) => (ms ? new Date(ms).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : null);
 
   function renderPart(part, assetPath) {
@@ -250,9 +274,9 @@
     }
     const name = escapeHtml(part.name || 'attachment');
     if (assetPath) {
-      return `<a class="attachment" href="${escapeHtml(encodeURI(assetPath))}">📎 ${name}</a>`;
+      return `<a class="attachment" href="${escapeHtml(encodeURI(assetPath))}">${icon('clip')}${name}</a>`;
     }
-    return `<span class="attachment missing">📎 ${name}: not retrievable</span>`;
+    return `<span class="attachment missing">${icon('clip')}${name}: not retrievable</span>`;
   }
 
   function render(conversation, settings, assetPaths) {
@@ -276,7 +300,11 @@
 
     const turns = conversation.turns.map((turn) => {
       const kind = turn.isThought ? 'thought' : turn.role;
-      const label = turn.isThought ? '🧠 Model (Reasoning)' : turn.role === 'user' ? '👤 User' : '🤖 Model';
+      const label = turn.isThought
+        ? `${icon('thought')}Model (Reasoning)`
+        : turn.role === 'user'
+          ? `${icon('user')}User`
+          : `${icon('model')}Model`;
       const sub = [];
       if (settings.includeTimestamps && turn.timestamp) sub.push(fmtDate(turn.timestamp));
       if (settings.includeTokenCounts && turn.tokenCount !== null) sub.push(`${turn.tokenCount} tokens`);
@@ -298,20 +326,20 @@
       // Reasoning collapses; it is usually longer than the answer it precedes.
       if (turn.isThought) {
         return `<details class="thought">
-  <summary><span>${label}</span>${subHtml}</summary>
+  <summary><span class="label">${label}</span>${subHtml}</summary>
   <div class="body">${media}${body}</div>
 </details>`;
       }
 
       return `<article class="turn ${kind}">
-  <header><span>${label}</span>${subHtml}</header>
+  <header><span class="label">${label}</span>${subHtml}</header>
   ${media}
   ${body}
 </article>`;
     });
 
     const system = settings.includeSystemInstruction && conversation.systemInstruction
-      ? `<article class="turn thought"><header><span>⚙️ System Instruction</span></header>${renderMarkdown(escapeHtml(conversation.systemInstruction))}</article>`
+      ? `<article class="turn thought"><header><span class="label">${icon('system')}System Instruction</span></header>${renderMarkdown(escapeHtml(conversation.systemInstruction))}</article>`
       : '';
 
     return `<!DOCTYPE html>
@@ -323,6 +351,7 @@
 <style>${STYLE}</style>
 </head>
 <body>
+${SPRITE}
 <main>
 <h1>${escapeHtml(conversation.title)}</h1>
 <div class="meta">

@@ -14,7 +14,7 @@
   'use strict';
   const AISE = (root.AISE = root.AISE || {});
 
-  const ROLE_HEADING = { user: '## 👤 User', model: '## 🤖 Model', thought: '## 🧠 Model (Reasoning)' };
+  const ROLE_HEADING = { user: '## User', model: '## Model', thought: '## Model (Reasoning)' };
 
   const fmtDate = (ms) => (ms ? new Date(ms).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : null);
 
@@ -87,10 +87,12 @@
     }
     const name = part.name || (part.driveId ? `attachment-${part.driveId.slice(0, 8)}` : 'attachment');
     const size = part.byteLength ? ` _(${formatBytes(part.byteLength)})_` : '';
-    if (assetPath) return `📎 [${escapeLabel(name)}](${escapeTarget(assetPath)})${size}`;
+    // The "Attachment:" prefix is what tells a reader this link points at a
+    // bundled file rather than out at the web. It used to be a paperclip.
+    if (assetPath) return `**Attachment:** [${escapeLabel(name)}](${escapeTarget(assetPath)})${size}`;
     // No bytes retrieved; record that something was attached rather than
     // silently dropping it, so the export stays an honest record.
-    return `📎 **${escapeLabel(name)}**${size} _(file not retrievable)_`;
+    return `**Attachment:** ${escapeLabel(name)}${size} _(file not retrievable)_`;
   }
 
   function formatBytes(n) {
