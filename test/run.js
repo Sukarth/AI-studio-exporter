@@ -56,7 +56,8 @@ const { AISE } = globalThis;
 const SETTINGS = (0, eval)(
   fs.readFileSync(path.join(ROOT, 'settings.js'), 'utf8') +
     '\n;({ AI_STUDIO_FORMATS, AI_STUDIO_DEFAULT_SETTINGS, AI_STUDIO_FREE_FORMATS,' +
-    ' sanitizeSettings, isAIStudioUrl, isAIStudioPromptUrl, isAIStudioLibraryUrl });'
+    ' AI_STUDIO_THEMES, sanitizeSettings, isAIStudioUrl, isAIStudioPromptUrl,' +
+    ' isAIStudioLibraryUrl });'
 );
 
 const BOM = String.fromCharCode(0xfeff);
@@ -928,6 +929,70 @@ test('url helpers separate prompt pages from the rest of AI Studio', () => {
   // Must not be fooled by a lookalike host.
   assert.ok(!isAIStudioUrl('https://aistudio.google.com.evil.test/prompts/ABC'));
   assert.ok(!isAIStudioUrl('http://aistudio.google.com/prompts/ABC'), 'http is rejected');
+});
+
+// --- design tokens ------------------------------------------------------
+//
+// The injected overlay cannot link theme.css, so it carries its own copy of
+// the palette. Two copies of the same values is the kind of thing that drifts
+// silently and is only noticed months later, in a screenshot, by someone else.
+
+/**
+ * Custom-property declarations from one CSS rule, as a Map.
+ * @param {string} source - a stylesheet, or a template literal holding one
+ * @param {string} selector - the rule's selector, matched literally
+ */
+function readTokens(source, selector) {
+  const start = source.indexOf(selector);
+  assert.notStrictEqual(start, -1, `no rule for ${selector}`);
+  const open = source.indexOf('{', start);
+  const close = source.indexOf('}', open);
+  const body = source.slice(open + 1, close);
+
+  const tokens = new Map();
+  for (const [, name, value] of body.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) {
+    // The two files are written in different house styles: `rgba(8, 9, 11,
+    // 0.72)` and `rgba(8,9,11,.72)` are the same colour and must compare equal.
+    tokens.set(name, value.trim().toLowerCase().replace(/\s+/g, '').replace(/(^|[(,])0\./g, '$1.'));
+  }
+  return tokens;
+}
+
+function assertPalettesAgree(themeSelector, overlaySelector, label) {
+  const theme = readTokens(fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8'), themeSelector);
+  const content = fs.readFileSync(path.join(ROOT, 'content.js'), 'utf8');
+  const overlayCss = /const OVERLAY_CSS = `([\s\S]*?)`;/.exec(content);
+  assert.ok(overlayCss, 'OVERLAY_CSS not found in content.js');
+  const overlay = readTokens(overlayCss[1], overlaySelector);
+
+  const shared = [...overlay.keys()].filter((name) => theme.has(name));
+  // Without this the test passes trivially the day someone renames a token,
+  // which is exactly the day it needed to fail.
+  assert.ok(shared.length >= 12, `expected the overlay to share the palette, found ${shared.length} tokens`);
+
+  const drifted = shared
+    .filter((name) => theme.get(name) !== overlay.get(name))
+    .map((name) => `--${name}: theme.css has ${theme.get(name)}, content.js has ${overlay.get(name)}`);
+  assert.deepStrictEqual(drifted, [], `${label} palette has drifted between theme.css and content.js`);
+}
+
+test('the overlay dark palette matches theme.css', () => {
+  assertPalettesAgree(":root,\n:root[data-theme='dark']", '#aise-overlay {', 'dark');
+});
+
+test('the overlay light palette matches theme.css', () => {
+  assertPalettesAgree(":root[data-theme='light']", "#aise-overlay[data-theme='light']", 'light');
+});
+
+test('every theme is a palette the stylesheet actually declares', () => {
+  // "system" is resolved in script; the stylesheet only ever sees dark or
+  // light, so a third value added to the setting without a matching rule would
+  // silently fall back to dark.
+  const css = fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8');
+  const missing = SETTINGS.AI_STUDIO_THEMES
+    .filter((name) => name !== 'system')
+    .filter((name) => !css.includes(`[data-theme='${name}']`));
+  assert.deepStrictEqual(missing, [], 'themes with no palette in theme.css');
 });
 
 // --- documentation ------------------------------------------------------

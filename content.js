@@ -82,16 +82,15 @@
 
   // --- progress overlay ---------------------------------------------------
 
-  // Tokens duplicated from theme.css by necessity: this markup is injected
-  // into a page we do not control, so it cannot link a stylesheet of ours.
   /**
    * The overlay's own copy of the design tokens.
    *
    * It is injected into a document we do not control, so it cannot link
-   * theme.css and cannot inherit anything. The values below are the same ones
-   * theme.css declares; change a colour there and change it here. Scoping them
-   * to #aise-overlay rather than :root also means we never touch a variable
-   * AI Studio might be using itself.
+   * theme.css and cannot inherit anything. Every token below that theme.css
+   * also declares must hold the same value; test/run.js compares the two and
+   * fails on drift, which is the only thing keeping this copy honest. Scoping
+   * them to #aise-overlay rather than :root also means we never touch a
+   * variable AI Studio might be using itself.
    */
   const OVERLAY_CSS = `
     @keyframes aise-spin { to { transform: rotate(360deg); } }
@@ -107,7 +106,7 @@
       --err: #e8736b; --err-label: #f0a49e;
       --err-10: rgba(232,115,107,.1); --err-16: rgba(232,115,107,.16);
       --err-18: rgba(232,115,107,.18); --err-30: rgba(232,115,107,.3);
-      --muted-line: #4b4f57; --muted-20: rgba(143,148,156,.2);
+      --track-muted: #4b4f57; --muted-20: rgba(143,148,156,.2);
       --lift: 0 24px 60px rgba(0,0,0,.5);
     }
     /* Written by the export, from the extension's own theme setting rather
@@ -119,11 +118,11 @@
       --accent: #1668d6; --accent-soft: #1257b4; --accent-20: rgba(22,104,214,.18);
       --accent-55: rgba(22,104,214,.45);
       --warn: #a76a12; --warn-label: #8a5810; --warn-body: #4d4232;
-      --warn-10: rgba(167,106,18,.09); --warn-20: rgba(167,106,18,.2);
+      --warn-10: rgba(167,106,18,.08); --warn-20: rgba(167,106,18,.2);
       --err: #cf3a2f; --err-label: #b02c22;
       --err-10: rgba(207,58,47,.07); --err-16: rgba(207,58,47,.12);
       --err-18: rgba(207,58,47,.15); --err-30: rgba(207,58,47,.28);
-      --muted-line: #b0b5be; --muted-20: rgba(102,108,119,.2);
+      --track-muted: #b0b5be; --muted-20: rgba(102,108,119,.2);
       --lift: 0 24px 60px rgba(20,22,30,.18);
     }
     #aise-overlay {
@@ -160,7 +159,7 @@
     }
     #aise-overlay .aise-bar > i { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
     #aise-overlay.is-warn .aise-bar > i { background: var(--warn); }
-    #aise-overlay.is-muted .aise-bar > i { background: var(--muted-line); }
+    #aise-overlay.is-muted .aise-bar > i { background: var(--track-muted); }
     #aise-overlay .aise-bar.is-sweep > i {
       width: 30%; background: var(--accent-55); animation: aise-sweep 1.4s ease-in-out infinite;
     }

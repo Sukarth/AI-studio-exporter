@@ -143,6 +143,37 @@ explaining why.
 
 See [THIRD-PARTY.md](THIRD-PARTY.md) for the dependency list and licensing.
 
+### The design system
+
+Every colour, radius and typeface the extension uses is a custom property in
+`theme.css`. Do not write a hex value into a page's `<style>` block; if you
+need a colour that is not there, add a token.
+
+The palette is built around one rule: **azure only ever means "this is the
+action"**. It is never decorative. Green, amber and red only ever mean state.
+Anything else is graphite.
+
+Two palettes exist, `:root` (dark, also the default) and
+`:root[data-theme='light']`. Each is declared exactly once. `theme-init.js`
+runs synchronously in `<head>` on both extension pages, resolves the stored
+`theme` setting (`system`, `dark` or `light`) to a concrete value and writes
+the attribute before first paint. The resolved value is mirrored into
+`localStorage` because `chrome.storage` is callback-based and would paint a
+frame late; both pages then correct it from `storage.sync` on load, which
+matters on a browser the profile has only just synced to.
+
+The injected overlay is the one exception, by necessity: it lives in a
+document we do not control and cannot link a stylesheet of ours, so
+`OVERLAY_CSS` in `content.js` carries its own copy of the tokens it needs.
+**Change a colour in `theme.css` and change it there too.** `npm test`
+compares the two files token by token, in both palettes, and fails on any
+value that has drifted; it also fails if the overlay stops sharing enough of
+the palette for that comparison to mean anything.
+
+Adding a setting means adding it to `AI_STUDIO_DEFAULT_SETTINGS` in
+`settings.js`, sanitising it in `sanitizeSettings`, and documenting it in
+`docs/settings.md`. The test suite fails on an undocumented setting.
+
 ### A note on non-ASCII characters in source
 
 Write control characters and unusual codepoints as escapes (`\u0000`, `\u00A0`),
