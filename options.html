@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Studio Exporter settings</title>
+  <script src="theme-init.js"></script>
   <link rel="stylesheet" href="theme.css">
   <style>
     body { padding: 48px 24px 96px; }
@@ -15,7 +16,7 @@
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 22px;
+      gap: 16px;
     }
 
     .page-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
@@ -23,25 +24,40 @@
     .page-head .build { font-family: var(--mono); font-size: 11px; color: var(--dimmer); }
     .page-head .build .tier { color: var(--accent-soft); }
 
-    .lede { margin: -12px 0 0; font-size: 12.5px; color: var(--dim); }
+    .lede { margin: -8px 0 6px; font-size: 12.5px; color: var(--dim); }
+    .lede a { color: var(--accent-soft); text-decoration: none; }
 
-    /* A group of settings that needs no container of its own. */
-    .group { display: flex; flex-direction: column; gap: 12px; }
-    /* A group that is a thing in its own right: licence, backups. */
+    /* Every section is a card.
+       The page previously mixed bare groups with bordered panels, so the
+       licence and the backup schedule looked like the only two things with
+       edges and the twelve switches between them ran together into one
+       undifferentiated column. One container type, used everywhere, is what
+       makes a long settings page scannable. */
     .panel {
       display: flex;
       flex-direction: column;
       gap: 14px;
-      padding: 18px;
+      padding: 16px 18px 18px;
       border-radius: var(--r-xl);
       background: var(--raised);
       border: 1px solid var(--line-soft);
     }
     .panel.is-locked { opacity: 0.55; }
-    .panel-head { display: flex; align-items: center; gap: 9px; }
-    .group > .hint, .panel > .hint { margin: -4px 0 0; font-size: 12px; color: var(--dim); }
-    .group > .hint a, .panel > .hint a, .lede a { color: var(--accent-soft); text-decoration: none; }
-    .group > .hint a:hover, .panel > .hint a:hover { text-decoration: underline; }
+
+    /* The card's own title bar, ruled off from its contents. */
+    .panel-head {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: -2px 0 -4px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--divider);
+    }
+    .panel-head .eyebrow { margin-right: auto; }
+
+    .hint { margin: -6px 0 0; font-size: 12px; color: var(--dim); }
+    .hint a { color: var(--accent-soft); text-decoration: none; }
+    .hint a:hover { text-decoration: underline; }
 
     .row { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
     .row .what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -58,12 +74,11 @@
     .split > label { flex: 1; display: flex; flex-direction: column; gap: 5px; }
 
     .licence-active { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .licence-active .who { display: flex; align-items: center; gap: 10px; }
     .licence-key { font-family: var(--mono); font-size: 12.5px; color: var(--text-3); }
 
     .page-foot {
       display: flex; justify-content: space-between; align-items: center; gap: 16px;
-      padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--divider);
+      padding-top: 16px; margin-top: 4px; border-top: 1px solid var(--divider);
     }
     .page-foot .links { display: flex; align-items: center; gap: 16px; font-size: 12.5px; }
     .page-foot a { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); text-decoration: none; }
@@ -78,14 +93,26 @@
       <symbol id="i-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <path d="m6 9.5 6 6 6-6"></path>
       </symbol>
-      <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m9 8.5-4 3.5 4 3.5"></path><path d="m15 8.5 4 3.5-4 3.5"></path>
-      </symbol>
       <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5"></path>
       </symbol>
       <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <path d="m5 12.5 4.5 4.5L19 7"></path>
+      </symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8.5 21h7"></path><path d="M12 17v4"></path>
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a6.8 6.8 0 0 0 10.8 10.8z"></path>
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4.2"></circle>
+        <path d="M12 1.8v2.4M12 19.8v2.4M4.8 4.8l1.7 1.7M17.5 17.5l1.7 1.7M1.8 12h2.4M19.8 12h2.4M4.8 19.2l1.7-1.7M17.5 6.5l1.7-1.7"></path>
+      </symbol>
+      <!-- The GitHub mark is a solid glyph, not an outline: it is a logo and
+           redrawing it as a stroke would make it something else. -->
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.93 3.19 9.11 7.61 10.58.56.1.76-.24.76-.53 0-.26-.01-1.14-.02-2.07-3.09.67-3.74-1.49-3.74-1.49-.5-1.27-1.22-1.61-1.22-1.61-.99-.68.08-.67.08-.67 1.1.08 1.68 1.13 1.68 1.13.98 1.67 2.57 1.19 3.2.91.1-.71.38-1.19.69-1.46-2.47-.28-5.06-1.24-5.06-5.52 0-1.22.44-2.22 1.16-3.01-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.11 1.15a10.78 10.78 0 0 1 2.83-.38c.96 0 1.93.13 2.83.38 2.16-1.46 3.11-1.15 3.11-1.15.61 1.54.23 2.68.11 2.96.72.79 1.16 1.79 1.16 3.01 0 4.29-2.6 5.24-5.08 5.51.39.34.74 1.02.74 2.06 0 1.49-.01 2.69-.01 3.06 0 .29.2.64.77.53C19.06 20.86 22.25 16.68 22.25 11.75 22.25 5.48 17.27.5 12 .5z"></path>
       </symbol>
     </defs>
   </svg>
@@ -100,8 +127,8 @@
       conversations is ever sent anywhere.
     </p>
 
-    <!-- ---------------------------------------------------------------- -->
-    <div class="panel">
+    <!-- --- licence ----------------------------------------------------- -->
+    <section class="panel">
       <div class="panel-head">
         <span class="eyebrow">Licence</span>
         <span id="proBadge" class="chip">LOCKED</span>
@@ -133,11 +160,38 @@
         <span class="notice-label"></span>
         <span class="notice-body"></span>
       </div>
-    </div>
+    </section>
 
-    <!-- ---------------------------------------------------------------- -->
-    <div class="group">
-      <span class="eyebrow">Defaults</span>
+    <!-- --- general ----------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">General</span>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Theme</strong>
+          <span>Applies to this page, the popup and the overlay on AI&nbsp;Studio.</span>
+        </div>
+        <!-- Radios rather than a select: three short, mutually exclusive
+             options, all worth seeing at once. -->
+        <div class="seg" role="radiogroup" aria-label="Theme">
+          <label>
+            <input type="radio" name="theme" id="themeSystem" value="system">
+            <span><svg><use href="#i-monitor"></use></svg>System</span>
+          </label>
+          <label>
+            <input type="radio" name="theme" id="themeDark" value="dark">
+            <span><svg><use href="#i-moon"></use></svg>Dark</span>
+          </label>
+          <label>
+            <input type="radio" name="theme" id="themeLight" value="light">
+            <span><svg><use href="#i-sun"></use></svg>Light</span>
+          </label>
+        </div>
+      </div>
+      <div class="rule"></div>
+
       <div class="row">
         <div class="what">
           <strong>Export format</strong>
@@ -148,11 +202,13 @@
           <svg><use href="#i-caret"></use></svg>
         </span>
       </div>
-    </div>
+    </section>
 
-    <!-- ---------------------------------------------------------------- -->
-    <div class="group">
-      <span class="eyebrow">What to include</span>
+    <!-- --- what to include --------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">What to include</span>
+      </div>
       <p class="hint">
         The API exposes far more than the page shows. Turn off anything you would rather
         keep out of your exports.
@@ -216,11 +272,13 @@
           <span class="switch"></span>
         </label>
       </div>
-    </div>
+    </section>
 
-    <!-- ---------------------------------------------------------------- -->
-    <div class="group">
-      <span class="eyebrow">Attachments</span>
+    <!-- --- attachments -------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Attachments</span>
+      </div>
       <p class="hint">
         Files are fetched from Drive, so exports contain the real thing rather than a
         thumbnail.
@@ -282,10 +340,10 @@
           </label>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- ---------------------------------------------------------------- -->
-    <div class="group">
+    <!-- --- fine-tuning -------------------------------------------------- -->
+    <section class="panel">
       <div class="panel-head">
         <span class="eyebrow">Fine-tuning dataset</span>
         <span class="chip">PRO</span>
@@ -307,10 +365,10 @@
           <span class="switch"></span>
         </label>
       </div>
-    </div>
+    </section>
 
-    <!-- ---------------------------------------------------------------- -->
-    <div class="panel" id="backupPanel">
+    <!-- --- scheduled backup --------------------------------------------- -->
+    <section class="panel" id="backupPanel">
       <div class="panel-head">
         <span class="eyebrow">Scheduled backup</span>
         <span id="backupProBadge" class="chip">PRO</span>
@@ -359,11 +417,13 @@
         <span class="notice-label"></span>
         <span class="notice-body"></span>
       </div>
-    </div>
+    </section>
 
-    <!-- ---------------------------------------------------------------- -->
-    <div class="group">
-      <span class="eyebrow">Advanced</span>
+    <!-- --- advanced ----------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Advanced</span>
+      </div>
       <p class="hint">Only used when the API is unavailable and the page has to be scraped instead.</p>
       <div class="row">
         <div class="what">
@@ -373,7 +433,7 @@
         <input type="number" id="loadDelay" class="input" min="200" max="5000" step="50"
                aria-label="Page load delay in milliseconds">
       </div>
-    </div>
+    </section>
 
     <div class="page-foot">
       <span class="links">
@@ -386,7 +446,7 @@
           <svg><use href="#i-book"></use></svg>Format docs
         </a>
         <a href="https://github.com/Sukarth/AI-studio-exporter" target="_blank" rel="noopener noreferrer">
-          <svg><use href="#i-code"></use></svg>GitHub
+          <svg><use href="#i-github"></use></svg>GitHub
         </a>
       </span>
     </div>

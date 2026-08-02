@@ -91,6 +91,24 @@ function fillFormatSelect(select, selected) {
   }
 }
 
+/** The checked radio in the theme group, or the default. */
+const currentTheme = () => {
+  const checked = document.querySelector('input[name="theme"]:checked');
+  return checked ? checked.value : 'system';
+};
+
+/**
+ * Theme applies the moment it is clicked, not on Save.
+ *
+ * Everything else on this page describes a future export, so waiting for Save
+ * is right. Appearance is the one setting whose result is on screen already;
+ * making it wait would mean choosing a theme you cannot see.
+ */
+function applyTheme(pref) {
+  if (window.AISE_THEME) window.AISE_THEME.set(pref);
+  chrome.storage.sync.set({ theme: pref });
+}
+
 function syncAttachmentSubOptions() {
   const enabled = el('scrapeAttachments').checked;
   const block = el('attachmentOptions');
@@ -108,12 +126,20 @@ function loadSettings() {
     }
     el('loadDelay').value = settings.loadDelay;
     fillFormatSelect(el('defaultFormat'), settings.defaultFormat);
+    const radio = document.querySelector(`input[name="theme"][value="${settings.theme}"]`);
+    if (radio) radio.checked = true;
+    // theme-init.js painted from the local cache; storage.sync is the truth.
+    if (window.AISE_THEME) window.AISE_THEME.set(settings.theme);
     syncAttachmentSubOptions();
   });
 }
 
 function saveSettings() {
-  const raw = { loadDelay: el('loadDelay').value, defaultFormat: el('defaultFormat').value };
+  const raw = {
+    loadDelay: el('loadDelay').value,
+    defaultFormat: el('defaultFormat').value,
+    theme: currentTheme(),
+  };
   for (const key of CHECKBOX_SETTINGS) {
     if (el(key)) raw[key] = el(key).checked;
   }
@@ -285,6 +311,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   el('saveBtn').addEventListener('click', saveSettings);
   el('resetBtn').addEventListener('click', resetSettings);
   el('scrapeAttachments').addEventListener('change', syncAttachmentSubOptions);
+  for (const radio of document.querySelectorAll('input[name="theme"]')) {
+    radio.addEventListener('change', () => applyTheme(radio.value));
+  }
 
   el('activateBtn').addEventListener('click', activate);
   el('deactivateBtn').addEventListener('click', deactivate);

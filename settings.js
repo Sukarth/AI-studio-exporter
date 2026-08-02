@@ -49,7 +49,14 @@ const AI_STUDIO_DEFAULT_SETTINGS = Object.freeze({
 
   defaultFormat: 'markdown',
   loadDelay: 700,
+
+  // Appearance, applied to every surface the extension owns: the popup, this
+  // page, its modals, and the overlay injected into AI Studio. "system"
+  // follows the OS and is what almost everyone should leave it on.
+  theme: 'system',
 });
+
+const AI_STUDIO_THEMES = Object.freeze(['system', 'dark', 'light']);
 
 /**
  * Format catalogue for UI use.
@@ -94,6 +101,8 @@ function sanitizeSettings(raw = {}) {
   if (typeof raw.defaultFormat === 'string' && /^[a-z0-9-]{1,32}$/.test(raw.defaultFormat)) {
     sanitized.defaultFormat = raw.defaultFormat;
   }
+
+  if (AI_STUDIO_THEMES.includes(raw.theme)) sanitized.theme = raw.theme;
 
   const parsedDelay = Number(raw.loadDelay);
   if (Number.isFinite(parsedDelay) && parsedDelay >= 200 && parsedDelay <= 5000) {

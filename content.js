@@ -84,70 +84,137 @@
 
   // Tokens duplicated from theme.css by necessity: this markup is injected
   // into a page we do not control, so it cannot link a stylesheet of ours.
+  /**
+   * The overlay's own copy of the design tokens.
+   *
+   * It is injected into a document we do not control, so it cannot link
+   * theme.css and cannot inherit anything. The values below are the same ones
+   * theme.css declares; change a colour there and change it here. Scoping them
+   * to #aise-overlay rather than :root also means we never touch a variable
+   * AI Studio might be using itself.
+   */
   const OVERLAY_CSS = `
     @keyframes aise-spin { to { transform: rotate(360deg); } }
     @keyframes aise-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(333%); } }
     #aise-overlay {
+      --scrim: rgba(8,9,11,.72);
+      --raised: #16181c; --line-card: #262931; --line: #2b2e36; --track: #26282f;
+      --text: #e7e8ea; --dim: #8f949c; --dimmer: #6f757d; --disabled-ink: #5c6169;
+      --accent: #4f9dfa; --accent-soft: #9cc9fd; --accent-20: rgba(79,157,250,.2);
+      --accent-55: rgba(79,157,250,.55);
+      --warn: #d9a34a; --warn-label: #e0be86; --warn-body: #cbbfa6;
+      --warn-10: rgba(217,163,74,.1); --warn-20: rgba(217,163,74,.2);
+      --err: #e8736b; --err-label: #f0a49e;
+      --err-10: rgba(232,115,107,.1); --err-16: rgba(232,115,107,.16);
+      --err-18: rgba(232,115,107,.18); --err-30: rgba(232,115,107,.3);
+      --muted-line: #4b4f57; --muted-20: rgba(143,148,156,.2);
+      --lift: 0 24px 60px rgba(0,0,0,.5);
+    }
+    /* Written by the export, from the extension's own theme setting rather
+       than from AI Studio's, which the user may well have set differently. */
+    #aise-overlay[data-theme='light'] {
+      --scrim: rgba(20,22,26,.35);
+      --raised: #ffffff; --line-card: #e3e5ea; --line: #d1d5dd; --track: #e3e5ea;
+      --text: #14161a; --dim: #666c77; --dimmer: #858b96; --disabled-ink: #a3a8b2;
+      --accent: #1668d6; --accent-soft: #1257b4; --accent-20: rgba(22,104,214,.18);
+      --accent-55: rgba(22,104,214,.45);
+      --warn: #a76a12; --warn-label: #8a5810; --warn-body: #4d4232;
+      --warn-10: rgba(167,106,18,.09); --warn-20: rgba(167,106,18,.2);
+      --err: #cf3a2f; --err-label: #b02c22;
+      --err-10: rgba(207,58,47,.07); --err-16: rgba(207,58,47,.12);
+      --err-18: rgba(207,58,47,.15); --err-30: rgba(207,58,47,.28);
+      --muted-line: #b0b5be; --muted-20: rgba(102,108,119,.2);
+      --lift: 0 24px 60px rgba(20,22,30,.18);
+    }
+    #aise-overlay {
       position: fixed; inset: 0; z-index: 2147483000;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(8,9,11,.72); backdrop-filter: blur(8px);
+      background: var(--scrim); backdrop-filter: blur(8px);
       font-family: Manrope, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     #aise-overlay .aise-card {
       width: 340px; padding: 26px; text-align: center;
-      background: #16181c; border: 1px solid #262931; border-radius: 16px;
-      box-shadow: 0 24px 60px rgba(0,0,0,.5); color: #e7e8ea;
+      background: var(--raised); border: 1px solid var(--line-card); border-radius: 16px;
+      box-shadow: var(--lift); color: var(--text);
     }
     #aise-overlay .aise-spin {
       width: 36px; height: 36px; margin: 0 auto 16px; border-radius: 50%;
-      border: 3px solid rgba(79,157,250,.2); border-top-color: #4f9dfa;
+      border: 3px solid var(--accent-20); border-top-color: var(--accent);
       animation: aise-spin 1s linear infinite;
     }
-    #aise-overlay.is-warn .aise-spin { border-color: rgba(217,163,74,.2); border-top-color: #d9a34a; }
-    #aise-overlay.is-muted .aise-spin { border-color: rgba(143,148,156,.2); border-top-color: #8f949c; }
+    #aise-overlay.is-warn .aise-spin { border-color: var(--warn-20); border-top-color: var(--warn); }
+    #aise-overlay.is-muted .aise-spin { border-color: var(--muted-20); border-top-color: var(--dim); }
     #aise-overlay .aise-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; letter-spacing: -.01em; }
     #aise-overlay .aise-stage {
       display: flex; align-items: center; justify-content: center; gap: 8px;
-      font-size: 13px; color: #8f949c; min-height: 20px;
+      font-size: 13px; color: var(--dim); min-height: 20px;
     }
-    #aise-overlay.is-warn .aise-stage { color: #e0be86; }
+    #aise-overlay.is-warn .aise-stage { color: var(--warn-label); }
     #aise-overlay .aise-failed {
       font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
-      background: rgba(232,115,107,.16); color: #f0a49e;
+      background: var(--err-16); color: var(--err-label);
     }
     #aise-overlay .aise-bar {
-      height: 4px; border-radius: 999px; background: #26282f;
+      height: 4px; border-radius: 999px; background: var(--track);
       margin: 16px 0 10px; overflow: hidden;
     }
-    #aise-overlay .aise-bar > i { display: block; height: 100%; background: #4f9dfa; transition: width .25s ease; }
-    #aise-overlay.is-warn .aise-bar > i { background: #d9a34a; }
-    #aise-overlay.is-muted .aise-bar > i { background: #4b4f57; }
+    #aise-overlay .aise-bar > i { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
+    #aise-overlay.is-warn .aise-bar > i { background: var(--warn); }
+    #aise-overlay.is-muted .aise-bar > i { background: var(--muted-line); }
     #aise-overlay .aise-bar.is-sweep > i {
-      width: 30%; background: rgba(79,157,250,.55); animation: aise-sweep 1.4s ease-in-out infinite;
+      width: 30%; background: var(--accent-55); animation: aise-sweep 1.4s ease-in-out infinite;
     }
     #aise-overlay .aise-count {
       font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
-      font-size: 11.5px; color: #6f757d; margin-bottom: 16px; min-height: 17px;
+      font-size: 11.5px; color: var(--dimmer); margin-bottom: 16px; min-height: 17px;
     }
-    #aise-overlay.is-accent .aise-count { color: #9cc9fd; }
-    #aise-overlay.is-warn .aise-count { color: #e0be86; }
+    #aise-overlay.is-accent .aise-count { color: var(--accent-soft); }
+    #aise-overlay.is-warn .aise-count { color: var(--warn-label); }
     #aise-overlay .aise-note {
       margin: 14px 0 12px; padding: 9px 11px; border-radius: 9px; text-align: left;
-      background: rgba(217,163,74,.1); font-size: 11.5px; line-height: 1.45; color: #cbbfa6;
+      background: var(--warn-10); font-size: 11.5px; line-height: 1.45; color: var(--warn-body);
     }
     #aise-overlay .aise-cancel {
       padding: 9px 18px; border-radius: 8px; font-family: inherit;
       font-size: 12.5px; font-weight: 600; cursor: pointer;
-      background: rgba(232,115,107,.1); border: 1px solid rgba(232,115,107,.3); color: #e8736b;
+      background: var(--err-10); border: 1px solid var(--err-30); color: var(--err);
     }
-    #aise-overlay .aise-cancel:hover { background: rgba(232,115,107,.18); }
+    #aise-overlay .aise-cancel:hover { background: var(--err-18); }
     #aise-overlay .aise-cancel:disabled {
-      background: transparent; border-color: #2b2e36; color: #5c6169; cursor: not-allowed;
+      background: transparent; border-color: var(--line); color: var(--disabled-ink); cursor: not-allowed;
     }
     @media (prefers-reduced-motion: reduce) {
       #aise-overlay .aise-spin, #aise-overlay .aise-bar > i { animation: none; }
     }
   `;
+
+  /**
+   * The theme, kept warm.
+   *
+   * The overlay goes up before the export's own settings read has returned, so
+   * asking storage at that point would paint dark and correct itself a frame
+   * later. Reading it once at injection and following changes costs nothing
+   * and is right every time after the first paint of the page.
+   */
+  let themePreference = 'system';
+  const resolvedTheme = () => {
+    if (themePreference === 'light' || themePreference === 'dark') return themePreference;
+    try {
+      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    } catch (_) {
+      return 'dark';
+    }
+  };
+  try {
+    chrome.storage.sync.get({ theme: 'system' }, (stored) => {
+      if (stored && stored.theme) themePreference = stored.theme;
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'sync' && changes.theme) themePreference = changes.theme.newValue || 'system';
+    });
+  } catch (_) {
+    // No storage access means the system default, which is a fine answer.
+  }
 
   function showLoadingOverlay(heading) {
     if (document.getElementById('aise-overlay')) return;
@@ -163,6 +230,9 @@
     const overlay = document.createElement('div');
     overlay.id = 'aise-overlay';
     overlay.className = 'is-accent';
+    // On the element rather than in the class list, because paintOverlay
+    // rewrites className on every tick.
+    overlay.dataset.theme = resolvedTheme();
 
     // Built as nodes rather than one innerHTML string: the heading is a
     // parameter, and a template that interpolates one is a template someone

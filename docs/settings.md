@@ -101,6 +101,21 @@ the answer beside it.
 
 Which format the popup preselects.
 
+### Theme (`theme`): `system`
+
+`system`, `dark` or `light`. Changes nothing about an export; it is the only
+setting here that does not.
+
+It applies to every surface the extension owns: the popup, this settings page,
+its dialogs, and the progress overlay drawn over AI Studio during an export.
+The overlay follows this setting rather than AI Studio's own, so a dark
+extension on a light AI Studio stays dark.
+
+`system` follows the operating system and updates live if the OS switches
+while a page is open. Unlike everything else here, choosing a theme applies
+immediately rather than on **Save**: it is the one setting whose result is
+already on screen, so making it wait would mean picking a theme you cannot see.
+
 ### DOM fallback only
 
 These four apply solely when the API path is unavailable and the page has to be

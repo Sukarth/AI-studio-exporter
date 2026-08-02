@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>AI Studio Exporter</title>
+  <script src="theme-init.js"></script>
   <link rel="stylesheet" href="theme.css">
   <style>
     body { width: 340px; }
@@ -12,12 +13,10 @@
 
     .pop-head { display: flex; justify-content: space-between; align-items: center; }
     .pop-head h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
-    .icon-btn {
-      display: inline-flex; padding: 4px; border: none; background: none;
-      color: var(--dim); cursor: pointer; border-radius: var(--r-sm);
-    }
-    .icon-btn:hover { color: var(--text); }
-    .icon-btn svg { width: 16px; height: 16px; display: block; }
+    /* Two icon buttons sit tight together so they read as one control group
+       rather than two unrelated affordances at opposite ends of a row. */
+    .pop-head .tools { display: flex; align-items: center; gap: 2px; margin-right: -6px; }
+    .pop-head .icon-btn svg { width: 16px; height: 16px; }
 
     /* progress panel, only while an export is running */
     .progress { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-lg); background: var(--accent-10); }
@@ -37,7 +36,7 @@
       color: var(--text); font-family: var(--sans); font-size: 13px; cursor: pointer;
       text-align: left;
     }
-    .picker-btn:hover:not(:disabled) { border-color: #3a3e48; }
+    .picker-btn:hover:not(:disabled) { border-color: var(--dimmer); }
     .picker-btn[aria-expanded='true'] { border-color: var(--accent); }
     .picker-btn:disabled { color: var(--dim); cursor: not-allowed; }
     .picker-btn svg { width: 12px; height: 12px; color: var(--dim); flex: 0 0 auto; }
@@ -57,10 +56,10 @@
       padding: 7px 12px; font-size: 12.5px; color: var(--text-2); cursor: pointer;
       border: none; background: none; font-family: var(--sans); text-align: left; width: 100%;
     }
-    .picker-opt:hover:not([aria-disabled='true']) { background: #1d1f24; }
-    .picker-opt[aria-selected='true'] { background: rgba(79, 157, 250, 0.12); color: var(--accent-softer); }
+    .picker-opt:hover:not([aria-disabled='true']) { background: var(--hover); }
+    .picker-opt[aria-selected='true'] { background: var(--accent-16); color: var(--accent-softer); }
     .picker-opt[aria-disabled='true'] { color: var(--disabled-ink); cursor: not-allowed; }
-    .picker-opt:focus-visible { outline: none; background: #1d1f24; box-shadow: inset 2px 0 0 var(--accent); }
+    .picker-opt:focus-visible { outline: none; background: var(--hover); box-shadow: inset 2px 0 0 var(--accent); }
 
     .actions { display: flex; flex-direction: column; gap: 8px; }
     .actions .btn { width: 100%; padding: 12px; font-size: 13.5px; }
@@ -102,15 +101,26 @@
       <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4.5 12h15"></path><path d="m13.5 6 6 6-6 6"></path>
       </symbol>
+      <!-- The GitHub mark is a solid glyph, not an outline: it is a logo and
+           redrawing it as a stroke would make it something else. -->
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.93 3.19 9.11 7.61 10.58.56.1.76-.24.76-.53 0-.26-.01-1.14-.02-2.07-3.09.67-3.74-1.49-3.74-1.49-.5-1.27-1.22-1.61-1.22-1.61-.99-.68.08-.67.08-.67 1.1.08 1.68 1.13 1.68 1.13.98 1.67 2.57 1.19 3.2.91.1-.71.38-1.19.69-1.46-2.47-.28-5.06-1.24-5.06-5.52 0-1.22.44-2.22 1.16-3.01-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.11 1.15a10.78 10.78 0 0 1 2.83-.38c.96 0 1.93.13 2.83.38 2.16-1.46 3.11-1.15 3.11-1.15.61 1.54.23 2.68.11 2.96.72.79 1.16 1.79 1.16 3.01 0 4.29-2.6 5.24-5.08 5.51.39.34.74 1.02.74 2.06 0 1.49-.01 2.69-.01 3.06 0 .29.2.64.77.53C19.06 20.86 22.25 16.68 22.25 11.75 22.25 5.48 17.27.5 12 .5z"></path>
+      </symbol>
     </defs>
   </svg>
 
   <div class="pop">
     <div class="pop-head">
       <h1>AI Studio Exporter</h1>
-      <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
-        <svg><use href="#i-settings"></use></svg>
-      </button>
+      <span class="tools">
+        <a id="githubLink" class="icon-btn" href="https://github.com/Sukarth/AI-studio-exporter"
+           target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View on GitHub">
+          <svg><use href="#i-github"></use></svg>
+        </a>
+        <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
+          <svg><use href="#i-settings"></use></svg>
+        </button>
+      </span>
     </div>
 
     <!-- Only rendered when something stops you exporting. A green "everything

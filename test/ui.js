@@ -160,6 +160,80 @@ async function main() {
       assert.strictEqual(await options.isChecked('#condenseAttachments'), true);
     });
 
+    await test('choosing a theme applies it without pressing Save', async () => {
+      // Every other setting waits for Save; this one must not, because its
+      // result is the page you are looking at.
+      await options.click('#themeLight');
+      assert.strictEqual(
+        await options.getAttribute('html', 'data-theme'),
+        'light',
+        'the page repaints on click'
+      );
+      assert.strictEqual((await readSync(worker, 'theme')).theme, 'light', 'and persists on click');
+
+      // A resolved value, never the literal "system": the stylesheet declares
+      // each palette once and cannot resolve a preference itself.
+      await options.click('#themeSystem');
+      assert.ok(
+        ['light', 'dark'].includes(await options.getAttribute('html', 'data-theme')),
+        'system resolves to a concrete palette'
+      );
+      assert.strictEqual((await readSync(worker, 'theme')).theme, 'system');
+
+      await options.click('#themeDark');
+      assert.strictEqual(await options.getAttribute('html', 'data-theme'), 'dark');
+    });
+
+    await test('the light palette actually repaints the page', async () => {
+      const background = () =>
+        options.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+      await options.click('#themeDark');
+      const dark = await background();
+      await options.click('#themeLight');
+      const light = await background();
+
+      assert.notStrictEqual(dark, light, 'body background follows the theme');
+      // Graphite is near-black and the light page is near-white; assert the
+      // direction rather than an exact token, which is free to change.
+      const luminance = (rgb) => rgb.match(/\d+/g).slice(0, 3).reduce((a, b) => a + Number(b), 0);
+      assert.ok(luminance(light) > luminance(dark) + 300, `${light} is lighter than ${dark}`);
+
+      await options.click('#themeDark');
+    });
+
+    await test('the popup honours the theme the settings page set', async () => {
+      const popup = await context.newPage();
+      try {
+        await options.click('#themeLight');
+        await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+        await popup.waitForSelector('#exportBtn');
+        assert.strictEqual(await popup.getAttribute('html', 'data-theme'), 'light');
+
+        await options.click('#themeDark');
+        await popup.reload();
+        await popup.waitForSelector('#exportBtn');
+        assert.strictEqual(await popup.getAttribute('html', 'data-theme'), 'dark');
+      } finally {
+        await popup.close();
+      }
+    });
+
+    await test('the popup links back to the repository', async () => {
+      const popup = await context.newPage();
+      try {
+        await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+        await popup.waitForSelector('#githubLink');
+        assert.match(
+          await popup.getAttribute('#githubLink', 'href'),
+          /github\.com\/Sukarth\/AI-studio-exporter/
+        );
+        assert.strictEqual(await popup.getAttribute('#githubLink', 'target'), '_blank');
+      } finally {
+        await popup.close();
+      }
+    });
+
     await test('resetting restores every default', async () => {
       await options.click('#resetBtn');
       // The confirm is the extension's own dialog now, not the browser's.

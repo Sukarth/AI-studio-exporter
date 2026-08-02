@@ -38,11 +38,23 @@
   src: url('fonts/plex-mono-600-latin.woff2') format('woff2');
 }
 
-:root {
+/*
+ * Dark is the default and the base. Light overrides only the colour tokens
+ * below; nothing outside this block knows which one is active.
+ *
+ * The attribute is written by theme-init.js before first paint, and it always
+ * holds a concrete value: "system" is resolved to dark or light in script, so
+ * the stylesheet never has to express the same palette twice.
+ */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
   /* --- surface ------------------------------------------------------- */
   --page: #101114;
   --raised: #16181c;
   --field: #1d1f24;
+  --hover: #1d1f24;
   --disabled-bg: #23262c;
 
   --line: #2b2e36;
@@ -106,6 +118,90 @@
 
   --scrim: rgba(8, 9, 11, 0.72);
   --lift: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --toast-lift: 0 12px 30px rgba(0, 0, 0, 0.45);
+
+  /* --- component surfaces that are neither page nor state -------------- */
+  --notice-bg: #1a1c21;
+  --track: #26282f;
+  --track-muted: #4b4f57;
+  --knob-off: var(--disabled-ink);
+  --seg-on: #2b2e36;
+  --err-hover: #ef8a83;
+}
+
+/*
+ * Light.
+ *
+ * Derived from the same hues rather than invented. Azure, green, amber and red
+ * are each darkened until they clear 4.5:1 on white; they are the same accents,
+ * not a second set. Panels stay white and the page goes grey, which is the
+ * inverse of dark and keeps a card readable as a card.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --page: #f6f7f9;
+  --raised: #ffffff;
+  --field: #ffffff;
+  --hover: #f1f3f6;
+  --disabled-bg: #eceef2;
+
+  --line: #d1d5dd;
+  --line-card: #e3e5ea;
+  --line-soft: #e3e5ea;
+  --divider: #eaecf0;
+
+  --text: #14161a;
+  --text-2: #2c3038;
+  --text-3: #454a54;
+  --dim: #666c77;
+  --dimmer: #858b96;
+  --disabled-ink: #a3a8b2;
+
+  --accent: #1668d6;
+  --accent-hover: #1257b4;
+  --accent-ink: #ffffff;
+  --accent-soft: #1257b4;
+  --accent-softer: #0e4a99;
+  --accent-body: #3a4250;
+  --accent-08: rgba(22, 104, 214, 0.06);
+  --accent-10: rgba(22, 104, 214, 0.08);
+  --accent-16: rgba(22, 104, 214, 0.12);
+  --accent-22: rgba(22, 104, 214, 0.18);
+
+  --ok: #1f8a4d;
+  --ok-ink: #ffffff;
+  --ok-label: #17673a;
+  --ok-body: #3c4a41;
+  --ok-10: rgba(31, 138, 77, 0.08);
+  --ok-14: rgba(31, 138, 77, 0.12);
+
+  --warn: #a76a12;
+  --warn-ink: #ffffff;
+  --warn-label: #8a5810;
+  --warn-body: #4d4232;
+  --warn-10: rgba(167, 106, 18, 0.08);
+  --warn-16: rgba(167, 106, 18, 0.13);
+
+  --err: #cf3a2f;
+  --err-ink: #ffffff;
+  --err-label: #b02c22;
+  --err-body: #4d3330;
+  --err-10: rgba(207, 58, 47, 0.07);
+  --err-16: rgba(207, 58, 47, 0.12);
+  --err-30: rgba(207, 58, 47, 0.28);
+
+  --scrim: rgba(20, 22, 26, 0.35);
+  --lift: 0 24px 60px rgba(20, 22, 30, 0.18);
+  --toast-lift: 0 12px 30px rgba(20, 22, 30, 0.22);
+
+  --notice-bg: #f1f3f6;
+  --track: #e3e5ea;
+  --track-muted: #b0b5be;
+  /* White on a grey track, rather than grey on grey. */
+  --knob-off: #ffffff;
+  --seg-on: #ffffff;
+  --err-hover: #b02c22;
 }
 
 *,
@@ -195,7 +291,7 @@ body {
   color: var(--err-ink);
   font-weight: 700;
 }
-.btn-danger:hover:not(:disabled) { background: #ef8a83; }
+.btn-danger:hover:not(:disabled) { background: var(--err-hover); }
 
 /* A destructive action that is not the point of the screen: quiet until
    hovered, then unmistakably destructive. */
@@ -250,7 +346,7 @@ body {
   gap: 3px;
   padding: 11px 12px;
   border-radius: var(--r-lg);
-  background: #1a1c21;
+  background: var(--notice-bg);
 }
 .notice[hidden] { display: none; }
 .notice .notice-label {
@@ -317,7 +413,7 @@ body {
 .bar {
   height: 4px;
   border-radius: var(--r-pill);
-  background: #26282f;
+  background: var(--track);
   overflow: hidden;
 }
 .bar > span {
@@ -333,7 +429,7 @@ body {
   animation: bar-sweep 1.4s ease-in-out infinite;
 }
 .bar.is-warn > span { background: var(--warn); }
-.bar.is-muted > span { background: #4b4f57; }
+.bar.is-muted > span { background: var(--track-muted); }
 
 @keyframes bar-sweep {
   0% { transform: translateX(-100%); }
@@ -381,7 +477,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--disabled-ink);
+  background: var(--knob-off);
   transition: transform 0.16s ease, background-color 0.16s ease;
 }
 .switch-input:checked + .switch { background: var(--accent); }
@@ -391,6 +487,65 @@ body {
 }
 .switch-input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
 .switch-input:disabled { cursor: not-allowed; }
+
+/* Segmented control -----------------------------------------------------
+   For three-or-fewer mutually exclusive choices whose labels are short. A
+   select would hide two of the three behind a click; here all of them are
+   readable at once, which is the point. Radios underneath, so arrow keys and
+   the form semantics come free. */
+
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  flex: 0 0 auto;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.seg label { position: relative; display: block; }
+.seg input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.seg span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  white-space: nowrap;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+.seg svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.seg label:hover span { color: var(--text); }
+.seg input:checked + span { background: var(--seg-on); color: var(--text); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Icon buttons: a link or a button whose whole label is its glyph --------- */
+
+.icon-btn {
+  display: inline-flex;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+  border-radius: var(--r-md);
+  transition: color 0.14s ease, background-color 0.14s ease;
+}
+.icon-btn:hover { color: var(--text); background: var(--accent-10); }
+.icon-btn:active { background: var(--accent-16); }
+.icon-btn svg { width: 17px; height: 17px; display: block; }
 
 /* Selects: the browser's own arrow never matches, so it is replaced ------ */
 
@@ -485,7 +640,7 @@ body {
   font-size: 12.5px;
   font-weight: 700;
   line-height: 1;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--toast-lift);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;

@@ -377,6 +377,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const stored = await new Promise((resolve) =>
     chrome.storage.sync.get(AI_STUDIO_DEFAULT_SETTINGS, (s) => resolve(sanitizeSettings(s)))
   );
+  // theme-init.js already painted from the local cache, which is empty on a
+  // browser this profile has only just synced to. Correcting it here is a
+  // no-op in the common case and the difference between right and wrong once.
+  if (window.AISE_THEME) window.AISE_THEME.set(stored.theme);
   renderFormats(stored.defaultFormat);
   const initial = AI_STUDIO_FORMATS.find((f) => f.id === stored.defaultFormat);
   pickFormat(initial && !(initial.pro && !isPro) ? stored.defaultFormat : 'markdown');
