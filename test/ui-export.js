@@ -314,6 +314,25 @@ async function main() {
       assert.strictEqual(shape.bar, 4, JSON.stringify(shape));
       assert.ok(shape.count >= 17, JSON.stringify(shape));
 
+      // The overlay carries its own palette because it cannot link theme.css.
+      // Asserting it painted the card at all is what proves those tokens
+      // resolved: an unresolved var() leaves the background transparent.
+      const painted = await page.evaluate(() => {
+        const overlay = document.querySelector('#aise-overlay');
+        const card = overlay.querySelector('.aise-card');
+        return {
+          theme: overlay.dataset.theme,
+          card: getComputedStyle(card).backgroundColor,
+          spinner: getComputedStyle(overlay.querySelector('.aise-spin')).borderTopColor,
+        };
+      });
+      assert.ok(['dark', 'light'].includes(painted.theme), `resolved theme, got ${painted.theme}`);
+      assert.notStrictEqual(painted.card, 'rgba(0, 0, 0, 0)', 'the card has a background');
+      // Whichever palette the machine running this resolved to. Both values
+      // come from theme.css and are held to it by the drift test in run.js.
+      const azure = { dark: 'rgb(79, 157, 250)', light: 'rgb(22, 104, 214)' };
+      assert.strictEqual(painted.spinner, azure[painted.theme], `the ${painted.theme} azure`);
+
       const [download] = await Promise.all([downloaded, running]);
       await download.saveAs(path.join(downloadDir, `heading-${download.suggestedFilename()}`));
     });
