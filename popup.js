@@ -22,9 +22,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     progressStage: $('progressStage'),
     progressCount: $('progressCount'),
     progressBar: $('progressBar'),
-    formatBtn: $('formatBtn'),
-    formatValue: $('formatValue'),
-    formatList: $('formatList'),
     exportBtn: $('exportBtn'),
     btnText: $('btnText'),
     libraryBtn: $('exportLibraryBtn'),
@@ -43,7 +40,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isPro = false;
   let onPromptPage = false;
   let exporting = false;
-  let selectedFormat = 'markdown';
   let lastProgress = null;
   let pollTimer = null;
 
@@ -81,86 +77,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- format picker ------------------------------------------------------
 
   /**
-   * A listbox rather than a <select>, because the native control cannot show
-   * which formats are locked. Hiding the Pro formats entirely means nobody
-   * discovers what Pro buys, so they stay visible, chipped and unselectable.
+   * Pro formats stay listed, chipped and unselectable rather than hidden:
+   * hiding them means nobody discovers what Pro buys.
    */
-  function renderFormats(selected) {
-    el.formatList.textContent = '';
-    for (const format of AI_STUDIO_FORMATS) {
-      const locked = format.pro && !isPro;
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'picker-opt';
-      option.dataset.value = format.id;
-      option.setAttribute('role', 'option');
-      option.setAttribute('aria-selected', String(format.id === selected));
-      if (locked) option.setAttribute('aria-disabled', 'true');
+  const formatEntries = () =>
+    AI_STUDIO_FORMATS.map((format) => ({
+      value: format.id,
+      label: format.label,
+      chip: format.pro && !isPro ? 'PRO' : null,
+      disabled: format.pro && !isPro,
+    }));
 
-      const name = document.createElement('span');
-      name.textContent = format.label;
-      option.appendChild(name);
-
-      if (locked) {
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.textContent = 'PRO';
-        option.appendChild(chip);
-      }
-
-      option.addEventListener('click', () => {
-        if (locked) return;
-        pickFormat(format.id);
-        closeList();
-        el.formatBtn.focus();
-      });
-      el.formatList.appendChild(option);
-    }
-  }
-
-  function pickFormat(id) {
-    const format = AI_STUDIO_FORMATS.find((f) => f.id === id);
-    if (!format || (format.pro && !isPro)) return;
-    selectedFormat = id;
-    el.formatValue.textContent = format.label;
-    for (const option of el.formatList.children) {
-      option.setAttribute('aria-selected', String(option.dataset.value === id));
-    }
-    chrome.storage.sync.set({ defaultFormat: id });
-  }
-
-  const listOpen = () => el.formatBtn.getAttribute('aria-expanded') === 'true';
-
-  function openList() {
-    if (el.formatBtn.disabled) return;
-    el.formatList.hidden = false;
-    el.formatBtn.setAttribute('aria-expanded', 'true');
-    const current = el.formatList.querySelector('[aria-selected="true"]');
-    (current || el.formatList.firstElementChild).focus();
-  }
-
-  function closeList() {
-    el.formatList.hidden = true;
-    el.formatBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  el.formatBtn.addEventListener('click', () => (listOpen() ? closeList() : openList()));
-
-  el.formatList.addEventListener('keydown', (event) => {
-    const options = [...el.formatList.children];
-    const at = options.indexOf(document.activeElement);
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      const next = event.key === 'ArrowDown' ? at + 1 : at - 1;
-      (options[next] || options[event.key === 'ArrowDown' ? 0 : options.length - 1]).focus();
-    } else if (event.key === 'Escape') {
-      closeList();
-      el.formatBtn.focus();
-    }
-  });
-
-  document.addEventListener('click', (event) => {
-    if (listOpen() && !event.target.closest('.picker')) closeList();
+  const picker = AISE.listbox.create($('formatPicker'), {
+    label: 'Export format',
+    caret: 'i-caret',
+    onPick: (id) => chrome.storage.sync.set({ defaultFormat: id }),
   });
 
   // --- state --------------------------------------------------------------
@@ -201,8 +132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function setExporting(active, progress) {
     exporting = active;
-    el.formatBtn.disabled = active;
-    if (active) closeList();
+    picker.disabled = active;
     renderProgress(active ? progress || lastProgress || {} : null);
 
     el.exportBtn.disabled = active ? false : !onPromptPage;
@@ -345,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       hideMessage();
-      chrome.tabs.sendMessage(tab.id, { action: 'export', formatId: selectedFormat });
+      chrome.tabs.sendMessage(tab.id, { action: 'export', formatId: picker.value });
       // The overlay in the page reports progress from here; this window would
       // be destroyed the moment it loses focus anyway.
       window.close();
@@ -362,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       hideMessage();
-      chrome.tabs.sendMessage(tab.id, { action: 'exportLibrary', formatId: selectedFormat });
+      chrome.tabs.sendMessage(tab.id, { action: 'exportLibrary', formatId: picker.value });
       window.close();
     })
   );
@@ -381,9 +311,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // browser this profile has only just synced to. Correcting it here is a
   // no-op in the common case and the difference between right and wrong once.
   if (window.AISE_THEME) window.AISE_THEME.set(stored.theme);
-  renderFormats(stored.defaultFormat);
-  const initial = AI_STUDIO_FORMATS.find((f) => f.id === stored.defaultFormat);
-  pickFormat(initial && !(initial.pro && !isPro) ? stored.defaultFormat : 'markdown');
+  // setOptions drops a stored format the licence no longer allows, so the
+  // fallback below only has to cover that one case.
+  picker.setOptions(formatEntries(), stored.defaultFormat);
+  if (!picker.value) picker.setValue('markdown');
 
   await refresh();
   if (!exporting) await showLastRun();

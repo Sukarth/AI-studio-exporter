@@ -27,39 +27,9 @@
     .progress.is-warn { background: var(--warn-10); }
     .progress.is-warn .progress-stage, .progress.is-warn .progress-count { color: var(--warn-label); }
 
-    /* format picker */
-    .picker { display: flex; flex-direction: column; gap: 6px; }
-    .picker-btn {
-      display: flex; justify-content: space-between; align-items: center; gap: 10px;
-      width: 100%; padding: 10px 12px; background: var(--field);
-      border: 1px solid var(--line); border-radius: var(--r-md);
-      color: var(--text); font-family: var(--sans); font-size: 13px; cursor: pointer;
-      text-align: left;
-    }
-    .picker-btn:hover:not(:disabled) { border-color: var(--dimmer); }
-    .picker-btn[aria-expanded='true'] { border-color: var(--accent); }
-    .picker-btn:disabled { color: var(--dim); cursor: not-allowed; }
-    .picker-btn svg { width: 12px; height: 12px; color: var(--dim); flex: 0 0 auto; }
-
-    .picker-list {
-      display: flex; flex-direction: column; padding: 6px 0;
-      background: var(--raised); border: 1px solid var(--line);
-      border-radius: var(--r-md); max-height: 260px; overflow-y: auto;
-      /* The default scrollbar is light and lands in the middle of a dark
-         panel, which is the only bright thing in the whole popup. */
-      scrollbar-width: thin;
-      scrollbar-color: var(--line) transparent;
-    }
-    .picker-list[hidden] { display: none; }
-    .picker-opt {
-      display: flex; justify-content: space-between; align-items: center; gap: 10px;
-      padding: 7px 12px; font-size: 12.5px; color: var(--text-2); cursor: pointer;
-      border: none; background: none; font-family: var(--sans); text-align: left; width: 100%;
-    }
-    .picker-opt:hover:not([aria-disabled='true']) { background: var(--hover); }
-    .picker-opt[aria-selected='true'] { background: var(--accent-16); color: var(--accent-softer); }
-    .picker-opt[aria-disabled='true'] { color: var(--disabled-ink); cursor: not-allowed; }
-    .picker-opt:focus-visible { outline: none; background: var(--hover); box-shadow: inset 2px 0 0 var(--accent); }
+    /* The picker itself is in theme.css; the settings page uses the same one. */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .picker-btn { padding: 10px 12px; }
 
     .actions { display: flex; flex-direction: column; gap: 8px; }
     .actions .btn { width: 100%; padding: 12px; font-size: 13.5px; }
@@ -142,14 +112,10 @@
       <div id="progressBar" class="bar is-indeterminate"><span style="width:0%"></span></div>
     </div>
 
-    <div class="picker">
+    <div class="field">
       <span class="field-label" id="formatLabel">Export format</span>
-      <button id="formatBtn" class="picker-btn" type="button"
-              aria-haspopup="listbox" aria-expanded="false" aria-labelledby="formatLabel formatBtn">
-        <span id="formatValue">Markdown</span>
-        <svg><use href="#i-caret"></use></svg>
-      </button>
-      <div id="formatList" class="picker-list" role="listbox" aria-labelledby="formatLabel" hidden></div>
+      <!-- Filled by src/listbox.js. -->
+      <div id="formatPicker"></div>
     </div>
 
     <div class="actions">
@@ -180,6 +146,7 @@
 
   <script src="settings.js"></script>
   <script src="src/badge.js"></script>
+  <script src="src/listbox.js"></script>
   <script src="pro/license.js"></script>
   <script src="popup.js"></script>
 </body>

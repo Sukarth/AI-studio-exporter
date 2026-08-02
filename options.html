@@ -44,18 +44,22 @@
     }
     .panel.is-locked { opacity: 0.55; }
 
-    /* The card's own title bar, ruled off from its contents. */
+    /* The card's title bar: name, badge, and what the section is for. The
+       description belongs inside the header rather than under the rule,
+       because it introduces the settings and a rule between the two says the
+       opposite. */
     .panel-head {
       display: flex;
-      align-items: center;
-      gap: 9px;
-      margin: -2px 0 -4px;
-      padding-bottom: 12px;
+      flex-direction: column;
+      gap: 8px;
+      margin: -2px 0 -2px;
+      padding-bottom: 14px;
       border-bottom: 1px solid var(--divider);
     }
+    .panel-head .titles { display: flex; align-items: center; gap: 9px; }
     .panel-head .eyebrow { margin-right: auto; }
 
-    .hint { margin: -6px 0 0; font-size: 12px; color: var(--dim); }
+    .hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dim); }
     .hint a { color: var(--accent-soft); text-decoration: none; }
     .hint a:hover { text-decoration: underline; }
 
@@ -63,7 +67,7 @@
     .row .what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .row .what strong { font-size: 13.5px; font-weight: 600; }
     .row .what span { font-size: 12px; color: var(--dim); }
-    .row .select, .row .input { width: 200px; flex: 0 0 auto; }
+    .row .picker, .row .input { width: 220px; flex: 0 0 auto; }
 
     .rule { height: 1px; background: var(--divider); }
 
@@ -130,8 +134,14 @@
     <!-- --- licence ----------------------------------------------------- -->
     <section class="panel">
       <div class="panel-head">
-        <span class="eyebrow">Licence</span>
-        <span id="proBadge" class="chip">LOCKED</span>
+        <div class="titles">
+          <span class="eyebrow">Licence</span>
+          <span id="proBadge" class="chip">LOCKED</span>
+        </div>
+        <p class="hint" id="licenseBlurb">
+          Pro unlocks PDF, Word, Obsidian, CSV and JSONL, whole-library export and
+          scheduled backups. One payment, no subscription.
+        </p>
       </div>
 
       <div id="licenseEntry" class="split">
@@ -148,10 +158,6 @@
         <button id="deactivateBtn" class="btn btn-destructive">Remove</button>
       </div>
 
-      <p class="hint" id="licenseBlurb">
-        Pro unlocks PDF, Word, Obsidian, CSV and JSONL, whole-library export and scheduled
-        backups. One payment, no subscription.
-      </p>
       <div class="split">
         <button id="buyBtn" class="btn btn-quiet">Get a licence</button>
       </div>
@@ -165,7 +171,9 @@
     <!-- --- general ----------------------------------------------------- -->
     <section class="panel">
       <div class="panel-head">
-        <span class="eyebrow">General</span>
+        <div class="titles">
+          <span class="eyebrow">General</span>
+        </div>
       </div>
 
       <div class="row">
@@ -173,7 +181,7 @@
           <strong>Theme</strong>
           <span>Applies to this page, the popup and the overlay on AI&nbsp;Studio.</span>
         </div>
-        <!-- Radios rather than a select: three short, mutually exclusive
+        <!-- Radios rather than a dropdown: three short, mutually exclusive
              options, all worth seeing at once. -->
         <div class="seg" role="radiogroup" aria-label="Theme">
           <label>
@@ -197,22 +205,22 @@
           <strong>Export format</strong>
           <span>Also set by the popup's picker, and used by scheduled backups.</span>
         </div>
-        <span class="select">
-          <select id="defaultFormat" aria-label="Default export format"></select>
-          <svg><use href="#i-caret"></use></svg>
-        </span>
+        <!-- Built by src/listbox.js, the same control the popup uses. -->
+        <div id="defaultFormat"></div>
       </div>
     </section>
 
     <!-- --- what to include --------------------------------------------- -->
     <section class="panel">
       <div class="panel-head">
-        <span class="eyebrow">What to include</span>
+        <div class="titles">
+          <span class="eyebrow">What to include</span>
+        </div>
+        <p class="hint">
+          The API exposes far more than the page shows. Turn off anything you would rather
+          keep out of your exports.
+        </p>
       </div>
-      <p class="hint">
-        The API exposes far more than the page shows. Turn off anything you would rather
-        keep out of your exports.
-      </p>
 
       <div class="row">
         <div class="what">
@@ -277,12 +285,14 @@
     <!-- --- attachments -------------------------------------------------- -->
     <section class="panel">
       <div class="panel-head">
-        <span class="eyebrow">Attachments</span>
+        <div class="titles">
+          <span class="eyebrow">Attachments</span>
+        </div>
+        <p class="hint">
+          Files are fetched from Drive, so exports contain the real thing rather than a
+          thumbnail.
+        </p>
       </div>
-      <p class="hint">
-        Files are fetched from Drive, so exports contain the real thing rather than a
-        thumbnail.
-      </p>
 
       <div class="row">
         <div class="what">
@@ -345,14 +355,16 @@
     <!-- --- fine-tuning -------------------------------------------------- -->
     <section class="panel">
       <div class="panel-head">
-        <span class="eyebrow">Fine-tuning dataset</span>
-        <span class="chip">PRO</span>
+        <div class="titles">
+          <span class="eyebrow">Fine-tuning dataset</span>
+          <span class="chip">PRO</span>
+        </div>
+        <p class="hint">
+          Applies to the JSONL export only.
+          <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/formats.md#jsonl"
+             target="_blank" rel="noopener">What goes in a JSONL export</a>
+        </p>
       </div>
-      <p class="hint">
-        Applies to the JSONL export only.
-        <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/formats.md#jsonl"
-           target="_blank" rel="noopener">What goes in a JSONL export</a>
-      </p>
 
       <div class="row">
         <div class="what">
@@ -370,17 +382,20 @@
     <!-- --- scheduled backup --------------------------------------------- -->
     <section class="panel" id="backupPanel">
       <div class="panel-head">
-        <span class="eyebrow">Scheduled backup</span>
-        <span id="backupProBadge" class="chip">PRO</span>
+        <div class="titles">
+          <span class="eyebrow">Scheduled backup</span>
+          <span id="backupProBadge" class="chip">PRO</span>
+        </div>
+        <p class="hint">
+          Runs in a background tab, with no overlay; watch the toolbar badge. Only what
+          changed since last time is fetched, and Chrome must be running when one is due.
+        </p>
       </div>
 
       <div id="backupControls">
         <div class="row">
           <div class="what">
             <strong>Back up my library automatically</strong>
-            <span>Runs in a background tab, with no overlay. Watch the toolbar badge.
-              Only what changed since last time is fetched, and Chrome must be running
-              when one is due.</span>
           </div>
           <label class="switch-wrap">
             <input type="checkbox" id="backupEnabled" class="switch-input">
@@ -391,21 +406,11 @@
         <div class="split" style="margin-top:14px">
           <label>
             <span class="field-label">Frequency</span>
-            <span class="select">
-              <select id="backupFrequency">
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-              <svg><use href="#i-caret"></use></svg>
-            </span>
+            <div id="backupFrequency"></div>
           </label>
           <label>
             <span class="field-label">Format</span>
-            <span class="select">
-              <select id="backupFormat"></select>
-              <svg><use href="#i-caret"></use></svg>
-            </span>
+            <div id="backupFormat"></div>
           </label>
           <label style="flex:0 0 auto; justify-content:flex-end">
             <button id="runBackupBtn" class="btn btn-quiet">Run now</button>
@@ -422,9 +427,14 @@
     <!-- --- advanced ----------------------------------------------------- -->
     <section class="panel">
       <div class="panel-head">
-        <span class="eyebrow">Advanced</span>
+        <div class="titles">
+          <span class="eyebrow">Advanced</span>
+        </div>
+        <p class="hint">
+          Only used when the API is unavailable and the page has to be scraped instead.
+        </p>
       </div>
-      <p class="hint">Only used when the API is unavailable and the page has to be scraped instead.</p>
+
       <div class="row">
         <div class="what">
           <strong>Page load delay</strong>
@@ -470,6 +480,7 @@
 
   <script src="settings.js"></script>
   <script src="src/badge.js"></script>
+  <script src="src/listbox.js"></script>
   <script src="pro/license.js"></script>
   <script src="options.js"></script>
 </body>

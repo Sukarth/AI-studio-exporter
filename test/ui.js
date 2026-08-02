@@ -58,6 +58,25 @@ async function test(name, fn) {
   }
 }
 
+/**
+ * Choose a value from one of our listboxes.
+ *
+ * There is no native <select> on either page any more: a select cannot show
+ * that an option is locked behind Pro, so both pages build their own. Which
+ * means a test has to open the list and click, as a user does.
+ */
+const pick = async (page, hostSelector, value) => {
+  await page.click(`${hostSelector} .picker-btn`);
+  await page.click(`${hostSelector} .picker-opt[data-value="${value}"]`);
+};
+
+/** Whether a format is chipped and unselectable on the settings page. */
+const lockedInOptions = (page, value) =>
+  page.$eval(
+    `#defaultFormat .picker-opt[data-value="${value}"]`,
+    (node) => node.getAttribute('aria-disabled') === 'true'
+  );
+
 /** Read a value straight out of the extension's own storage. */
 const readSync = (worker, keys) =>
   worker.evaluate((k) => new Promise((r) => chrome.storage.sync.get(k, r)), keys);
@@ -245,14 +264,18 @@ async function main() {
     });
 
     await test('Pro formats are visible but unselectable without a licence', async () => {
-      const formats = await options.$$eval('#defaultFormat option', (nodes) =>
-        nodes.map((n) => ({ value: n.value, disabled: n.disabled, label: n.textContent }))
+      const formats = await options.$$eval('#defaultFormat .picker-opt', (nodes) =>
+        nodes.map((n) => ({
+          value: n.dataset.value,
+          disabled: n.getAttribute('aria-disabled') === 'true',
+          chip: n.querySelector('.chip') ? n.querySelector('.chip').textContent : null,
+        }))
       );
       assert.strictEqual(formats.length, 9, 'all nine formats are listed');
 
       const pdf = formats.find((f) => f.value === 'pdf');
       assert.ok(pdf.disabled, 'PDF is locked');
-      assert.match(pdf.label, /Pro/, 'and says why');
+      assert.strictEqual(pdf.chip, 'PRO', 'and says why');
       assert.ok(!formats.find((f) => f.value === 'markdown').disabled, 'free formats stay open');
     });
 
@@ -281,7 +304,7 @@ async function main() {
 
       assert.strictEqual(await options.textContent('#proBadge'), 'ACTIVE');
 
-      const pdf = await options.$eval('#defaultFormat option[value="pdf"]', (n) => n.disabled);
+      const pdf = await lockedInOptions(options, 'pdf');
       assert.strictEqual(pdf, false, 'Pro formats became selectable');
 
       const locked = await options.$eval('#backupPanel', (n) => n.classList.contains('is-locked'));
@@ -304,7 +327,7 @@ async function main() {
     // --- scheduled backup -----------------------------------------------
 
     await test('enabling a backup creates a real chrome alarm', async () => {
-      await options.selectOption('#backupFrequency', 'daily');
+      await pick(options, '#backupFrequency', 'daily');
       await options.check('#backupEnabled');
       await options.waitForSelector('#backupNotice:not([hidden])');
 
@@ -343,7 +366,7 @@ async function main() {
     await test('the popup shows every format, with Pro unlocked by the licence', async () => {
       // A listbox rather than a <select>, so that locked formats can carry a
       // PRO chip instead of vanishing.
-      const formats = await popup.$$eval('#formatList .picker-opt', (nodes) =>
+      const formats = await popup.$$eval('#formatPicker .picker-opt', (nodes) =>
         nodes.map((n) => ({
           value: n.dataset.value,
           locked: n.getAttribute('aria-disabled') === 'true',
@@ -351,6 +374,28 @@ async function main() {
       );
       assert.strictEqual(formats.length, 9);
       assert.strictEqual(formats.find((f) => f.value === 'docx').locked, false);
+    });
+
+    await test('opening the format list does not make the popup taller', async () => {
+      // Chrome sizes a browser action popup to its document, so a dropdown in
+      // the normal flow makes the whole popup jump as it opens and closes.
+      // The list overlays instead, and is clamped to the content it sits in.
+      await popup.goto(popupUrl);
+      await popup.waitForSelector('#formatPicker .picker-btn');
+      const closed = await popup.evaluate(() => document.body.scrollHeight);
+
+      await popup.click('#formatPicker .picker-btn');
+      await popup.waitForSelector('#formatPicker .picker-list:not([hidden])');
+      const open = await popup.evaluate(() => document.body.scrollHeight);
+      assert.strictEqual(open, closed, 'the popup grew when the list opened');
+
+      // And it is genuinely on screen, not clamped out of existence.
+      const height = await popup.$eval(
+        '#formatPicker .picker-list',
+        (node) => node.getBoundingClientRect().height
+      );
+      assert.ok(height > 60, `the list is only ${height}px tall`);
+      await popup.keyboard.press('Escape');
     });
 
     await test('the popup hides the upgrade link once Pro is active', async () => {
@@ -379,7 +424,7 @@ async function main() {
     });
 
     await test('Pro locks again after removal', async () => {
-      const pdf = await options.$eval('#defaultFormat option[value="pdf"]', (n) => n.disabled);
+      const pdf = await lockedInOptions(options, 'pdf');
       assert.strictEqual(pdf, true);
     });
 
@@ -387,8 +432,8 @@ async function main() {
       // Reopened now that the licence is gone: hiding Pro formats entirely
       // means nobody discovers what Pro buys, so they stay visible.
       await popup.goto(popupUrl);
-      await popup.waitForSelector('#formatList .picker-opt', { state: 'attached' });
-      const free = await popup.$$eval('#formatList .picker-opt', (nodes) =>
+      await popup.waitForSelector('#formatPicker .picker-opt', { state: 'attached' });
+      const free = await popup.$$eval('#formatPicker .picker-opt', (nodes) =>
         nodes.map((n) => ({
           value: n.dataset.value,
           locked: n.getAttribute('aria-disabled') === 'true',

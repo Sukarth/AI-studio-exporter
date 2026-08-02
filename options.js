@@ -76,19 +76,55 @@ function confirmDialog({ title, body, confirmLabel }) {
   });
 }
 
-function fillFormatSelect(select, selected) {
-  select.textContent = '';
-  for (const format of AI_STUDIO_FORMATS) {
-    const option = document.createElement('option');
-    option.value = format.id;
-    option.disabled = format.pro && !isPro;
-    option.textContent = format.pro && !isPro ? `${format.label} (Pro)` : format.label;
-    select.appendChild(option);
-  }
-  select.value = selected;
-  if (select.selectedIndex === -1 || select.options[select.selectedIndex].disabled) {
-    select.value = 'markdown';
-  }
+// --- dropdowns -----------------------------------------------------------
+//
+// The same listbox the popup uses, for the same reason: a native <select>
+// cannot show that an option is locked behind Pro, and once one dropdown on
+// the page is custom the rest have to be too.
+
+const pickers = {
+  format: AISE.listbox.create(el('defaultFormat'), {
+    label: 'Default export format',
+    caret: 'i-caret',
+  }),
+  backupFrequency: AISE.listbox.create(el('backupFrequency'), {
+    label: 'Backup frequency',
+    caret: 'i-caret',
+    onPick: () => saveBackupState(),
+  }),
+  backupFormat: AISE.listbox.create(el('backupFormat'), {
+    label: 'Backup format',
+    caret: 'i-caret',
+    onPick: () => saveBackupState(),
+  }),
+};
+
+pickers.backupFrequency.setOptions(
+  [
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+  ],
+  'weekly'
+);
+
+/**
+ * Pro formats stay listed, chipped and unselectable rather than hidden:
+ * hiding them means nobody discovers what Pro buys.
+ */
+function fillFormatPicker(picker, selected) {
+  picker.setOptions(
+    AI_STUDIO_FORMATS.map((format) => ({
+      value: format.id,
+      label: format.label,
+      chip: format.pro && !isPro ? 'PRO' : null,
+      disabled: format.pro && !isPro,
+    })),
+    selected
+  );
+  // setOptions drops a value the licence no longer allows, so this only has to
+  // cover that one case.
+  if (!picker.value) picker.setValue('markdown');
 }
 
 /** The checked radio in the theme group, or the default. */
@@ -125,7 +161,7 @@ function loadSettings() {
       if (el(key)) el(key).checked = settings[key];
     }
     el('loadDelay').value = settings.loadDelay;
-    fillFormatSelect(el('defaultFormat'), settings.defaultFormat);
+    fillFormatPicker(pickers.format, settings.defaultFormat);
     const radio = document.querySelector(`input[name="theme"][value="${settings.theme}"]`);
     if (radio) radio.checked = true;
     // theme-init.js painted from the local cache; storage.sync is the truth.
@@ -137,7 +173,7 @@ function loadSettings() {
 function saveSettings() {
   const raw = {
     loadDelay: el('loadDelay').value,
-    defaultFormat: el('defaultFormat').value,
+    defaultFormat: pickers.format.value,
     theme: currentTheme(),
   };
   for (const key of CHECKBOX_SETTINGS) {
@@ -184,15 +220,17 @@ async function refreshLicenseUI() {
   el('backupPanel').classList.toggle('is-locked', !isPro);
   el('backupControls').classList.toggle('locked', !isPro);
   el('backupProBadge').hidden = isPro;
-  for (const control of ['backupEnabled', 'backupFrequency', 'backupFormat', 'runBackupBtn']) {
+  for (const control of ['backupEnabled', 'runBackupBtn']) {
     el(control).disabled = !isPro;
   }
+  pickers.backupFrequency.disabled = !isPro;
+  pickers.backupFormat.disabled = !isPro;
 
   if (isPro) clearNotice('licenseNotice');
 
   // Format pickers gain or lose their Pro entries with the licence.
-  fillFormatSelect(el('defaultFormat'), el('defaultFormat').value || 'markdown');
-  fillFormatSelect(el('backupFormat'), el('backupFormat').value || 'markdown');
+  fillFormatPicker(pickers.format, pickers.format.value || 'markdown');
+  fillFormatPicker(pickers.backupFormat, pickers.backupFormat.value || 'markdown');
 }
 
 async function activate() {
@@ -258,8 +296,8 @@ async function loadBackupState() {
   if (!state) return;
 
   el('backupEnabled').checked = !!state.enabled;
-  el('backupFrequency').value = state.frequency || 'weekly';
-  fillFormatSelect(el('backupFormat'), state.formatId || 'markdown');
+  pickers.backupFrequency.setValue(state.frequency || 'weekly');
+  fillFormatPicker(pickers.backupFormat, state.formatId || 'markdown');
 
   if (state.lastRunAt) {
     const { tone, label } = backupTone(state);
@@ -273,8 +311,8 @@ async function saveBackupState() {
     action: 'backup:configure',
     patch: {
       enabled: el('backupEnabled').checked,
-      frequency: el('backupFrequency').value,
-      formatId: el('backupFormat').value,
+      frequency: pickers.backupFrequency.value,
+      formatId: pickers.backupFormat.value,
     },
   });
   if (!state) return;
@@ -320,8 +358,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   el('buyBtn').addEventListener('click', () => chrome.tabs.create({ url: AI_STUDIO_PRO.purchaseUrl }));
 
   el('backupEnabled').addEventListener('change', saveBackupState);
-  el('backupFrequency').addEventListener('change', saveBackupState);
-  el('backupFormat').addEventListener('change', saveBackupState);
   el('runBackupBtn').addEventListener('click', runBackupNow);
 
   loadSettings();
