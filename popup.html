@@ -45,7 +45,11 @@
     .picker-list {
       display: flex; flex-direction: column; padding: 6px 0;
       background: var(--raised); border: 1px solid var(--line);
-      border-radius: var(--r-md); max-height: 232px; overflow-y: auto;
+      border-radius: var(--r-md); max-height: 260px; overflow-y: auto;
+      /* The default scrollbar is light and lands in the middle of a dark
+         panel, which is the only bright thing in the whole popup. */
+      scrollbar-width: thin;
+      scrollbar-color: var(--line) transparent;
     }
     .picker-list[hidden] { display: none; }
     .picker-opt {

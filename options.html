@@ -61,7 +61,10 @@
     .licence-active .who { display: flex; align-items: center; gap: 10px; }
     .licence-key { font-family: var(--mono); font-size: 12.5px; color: var(--text-3); }
 
-    .page-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 4px; }
+    .page-foot {
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--divider);
+    }
     .page-foot .links { display: flex; align-items: center; gap: 16px; font-size: 12.5px; }
     .page-foot a { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); text-decoration: none; }
     .page-foot a:hover { color: var(--text); }
@@ -114,10 +117,7 @@
       </div>
 
       <div id="licenseActive" class="licence-active" hidden>
-        <div class="who">
-          <span class="chip chip-round chip-ok">Active</span>
-          <span id="licenseMasked" class="licence-key"></span>
-        </div>
+        <span id="licenseMasked" class="licence-key"></span>
         <button id="deactivateBtn" class="btn btn-destructive">Remove</button>
       </div>
 
@@ -375,12 +375,11 @@
       </div>
     </div>
 
-    <div class="split">
-      <button id="saveBtn" class="btn btn-primary">Save settings</button>
-    </div>
-
     <div class="page-foot">
-      <button id="resetBtn" class="btn btn-destructive">Reset to defaults</button>
+      <span class="links">
+        <button id="saveBtn" class="btn btn-primary">Save settings</button>
+        <button id="resetBtn" class="btn btn-destructive">Reset to defaults</button>
+      </span>
       <span class="links">
         <a href="https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/README.md"
            target="_blank" rel="noopener noreferrer">
