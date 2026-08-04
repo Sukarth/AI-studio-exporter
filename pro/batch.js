@@ -145,7 +145,7 @@
       '',
       '_Exported with [AI Studio Exporter](https://github.com/Sukarth/AI-studio-exporter). ' +
         'What every file and field means: ' +
-        '[format documentation](https://github.com/Sukarth/AI-studio-exporter/blob/main/docs/README.md)._'
+        '[format documentation](https://exportaistudio.vercel.app/docs)._'
     );
 
     return lines.join('\n') + '\n';
