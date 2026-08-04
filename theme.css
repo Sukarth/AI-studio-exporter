@@ -328,15 +328,7 @@ body {
   background: var(--accent-16);
   color: var(--accent-soft);
 }
-.chip-round {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: var(--r-pill);
-  letter-spacing: 0;
-}
 .chip-ok { background: var(--ok-14); color: var(--ok-label); }
-.chip-err { background: var(--err-16); color: var(--err-label); }
 
 /* Notices: one pattern, four tones, used by both pages ------------------ */
 
@@ -619,37 +611,6 @@ body {
 .picker-opt[aria-selected='true'] { background: var(--accent-16); color: var(--accent-softer); }
 .picker-opt[aria-disabled='true'] { color: var(--disabled-ink); cursor: not-allowed; }
 .picker-opt:focus-visible { outline: none; background: var(--hover); box-shadow: inset 2px 0 0 var(--accent); }
-
-/* Selects: the browser's own arrow never matches, so it is replaced ------ */
-
-.select {
-  position: relative;
-  display: block;
-}
-.select select {
-  appearance: none;
-  width: 100%;
-  padding: 9px 32px 9px 12px;
-  background: var(--field);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 13px;
-  cursor: pointer;
-}
-.select select:focus-visible { outline: none; border-color: var(--accent); }
-.select select:disabled { color: var(--disabled-ink); cursor: not-allowed; }
-.select > svg {
-  position: absolute;
-  right: 11px;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  margin-top: -6px;
-  color: var(--dim);
-  pointer-events: none;
-}
 
 /* Text inputs ----------------------------------------------------------- */
 
