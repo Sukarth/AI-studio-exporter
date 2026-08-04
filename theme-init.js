@@ -73,4 +73,29 @@
       return apply(pref);
     },
   };
+
+  /**
+   * Correct a stale paint the moment storage says otherwise.
+   *
+   * Two ways to get one. chrome.storage.sync.set is asynchronous, so a popup
+   * opened in the instant after the settings page writes can read the previous
+   * value and cache it back. And a change made on another machine arrives here
+   * long after this page loaded. Both leave the local cache wrong, and both are
+   * fixed by the same listener; without it the first is sticky rather than
+   * momentary, because the stale value gets written back to the cache.
+   */
+  try {
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area !== 'sync' || !changes.theme) return;
+      var next = changes.theme.newValue || 'system';
+      try {
+        localStorage.setItem(KEY, next);
+      } catch (error) {
+        /* the attribute below still takes effect for this page */
+      }
+      apply(next);
+    });
+  } catch (error) {
+    // No extension APIs here; nothing to stay in step with.
+  }
 })();

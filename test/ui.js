@@ -223,16 +223,31 @@ async function main() {
 
     await test('the popup honours the theme the settings page set', async () => {
       const popup = await context.newPage();
+      // chrome.storage.sync.set is asynchronous, so a popup opened in the
+      // instant after the click can paint from the previous value and correct
+      // itself when the write lands. Waiting for the settled value is the
+      // honest assertion; that it settles at all is the thing under test.
+      const settles = (page, expected) =>
+        page.waitForFunction(
+          (want) => document.documentElement.dataset.theme === want,
+          expected,
+          { timeout: 5000 }
+        );
       try {
         await options.click('#themeLight');
         await popup.goto(`chrome-extension://${extensionId}/popup.html`);
         await popup.waitForSelector('#exportBtn');
-        assert.strictEqual(await popup.getAttribute('html', 'data-theme'), 'light');
+        await settles(popup, 'light');
 
         await options.click('#themeDark');
         await popup.reload();
         await popup.waitForSelector('#exportBtn');
-        assert.strictEqual(await popup.getAttribute('html', 'data-theme'), 'dark');
+        await settles(popup, 'dark');
+
+        // And a change made while a page is already open reaches it, which is
+        // what a second browser signed into the same profile looks like.
+        await options.click('#themeLight');
+        await settles(popup, 'light');
       } finally {
         await popup.close();
       }
