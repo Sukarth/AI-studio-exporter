@@ -29,12 +29,12 @@ value".
 | `exporter` | string | Always `"ai-studio-exporter"`. Use it to recognise the file. |
 | `id` | string | The AI Studio prompt id (a bare Drive id, no `prompts/` prefix). |
 | `title` | string | Conversation title. `"Untitled Conversation"` when AI Studio has none. |
-| `url` | string \| _optional_ | Canonical AI Studio URL. Omitted unless `includeSourceUrl`. |
-| `source` | `"api"` \| `"dom"` | Which extractor produced this. See [source](#source). |
+| `url` | string or _optional_ | Canonical AI Studio URL. Omitted unless `includeSourceUrl`. |
+| `source` | `"api"` or `"dom"` | Which extractor produced this. See [source](#source). |
 | `exportedAt` | ISO 8601 string | When the export ran. |
-| `modifiedAt` | ISO 8601 string \| null | Last modification per AI Studio. `null` if unknown. |
-| `config` | object \| null \| _optional_ | Model settings. Omitted unless `includeModelConfig`. |
-| `systemInstruction` | string \| null \| _optional_ | Omitted unless `includeSystemInstruction`. |
+| `modifiedAt` | ISO 8601 string or null | Last modification per AI Studio. `null` if unknown. |
+| `config` | object or null or _optional_ | Model settings. Omitted unless `includeModelConfig`. |
+| `systemInstruction` | string or null or _optional_ | Omitted unless `includeSystemInstruction`. |
 | `stats` | object | See [stats](#stats). |
 | `turns` | array | The conversation. See [turns](#turns). |
 
@@ -45,11 +45,11 @@ when that one value was absent.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `model` | string \| null | Prefixed, e.g. `"models/gemini-3-pro"`. Human-facing formats strip `models/`. |
-| `temperature` | number \| null | |
-| `topP` | number \| null | |
-| `topK` | number \| null | |
-| `maxOutputTokens` | number \| null | |
+| `model` | string or null | Prefixed, e.g. `"models/gemini-3-pro"`. Human-facing formats strip `models/`. |
+| `temperature` | number or null | |
+| `topP` | number or null | |
+| `topK` | number or null | |
+| `maxOutputTokens` | number or null | |
 | `safetySettings` | array | `[{category: number, threshold: number}]`, AI Studio's own numeric enums, passed through unmapped. |
 
 ### `stats`
@@ -64,31 +64,31 @@ not what the conversation originally held. Exclude reasoning and
 | `userTurns` | number | |
 | `modelTurns` | number | Answers only; excludes reasoning. |
 | `thoughtTurns` | number | Reasoning turns. |
-| `totalTokens` | number \| null | Sum of per-turn counts. `null` if AI Studio reported none. |
+| `totalTokens` | number or null | Sum of per-turn counts. `null` if AI Studio reported none. |
 | `attachments` | number | Attachments actually present in the export. |
 
 ### `turns`
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `role` | `"user"` \| `"model"` | |
+| `role` | `"user"` or `"model"` | |
 | `isThought` | boolean | `true` marks reasoning. Always a `model` turn. |
 | `text` | string | Message body, as Markdown. May be `""` on an attachment-only turn. |
-| `tokenCount` | number \| null \| _optional_ | Omitted unless `includeTokenCounts`. |
-| `excludedAttachments` | number \| _optional_ | See [below](#excludedattachments). Omitted when `0`. |
-| `timestamp` | ISO 8601 string \| _optional_ | Omitted unless `includeTimestamps`, or when AI Studio reported none. |
-| `parts` | array \| _optional_ | Attachments. Omitted when the turn has none. |
+| `tokenCount` | number or null or _optional_ | Omitted unless `includeTokenCounts`. |
+| `excludedAttachments` | number or _optional_ | See [below](#excludedattachments). Omitted when `0`. |
+| `timestamp` | ISO 8601 string or _optional_ | Omitted unless `includeTimestamps`, or when AI Studio reported none. |
+| `parts` | array or _optional_ | Attachments. Omitted when the turn has none. |
 
 #### `parts[]`
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `type` | `"image"` \| `"file"` | Decided by MIME type, not by extension. |
-| `name` | string \| undefined | Original filename, when AI Studio knew one. |
-| `mimeType` | string \| undefined | As reported by Drive. |
-| `driveId` | string \| undefined | Drive resource id. Stable; useful for deduplicating across exports. |
-| `byteLength` | number \| undefined | Size of the retrieved file. |
-| `path` | string \| null | Path inside the archive, e.g. `"attachments/screenshot.png"`. **`null` means the bytes could not be fetched** (the record of the attachment is kept, but no file exists). |
+| `type` | `"image"` or `"file"` | Decided by MIME type, not by extension. |
+| `name` | string or undefined | Original filename, when AI Studio knew one. |
+| `mimeType` | string or undefined | As reported by Drive. |
+| `driveId` | string or undefined | Drive resource id. Stable; useful for deduplicating across exports. |
+| `byteLength` | number or undefined | Size of the retrieved file. |
+| `path` | string or null | Path inside the archive, e.g. `"attachments/screenshot.png"`. **`null` means the bytes could not be fetched** (the record of the attachment is kept, but no file exists). |
 
 #### `excludedAttachments`
 
