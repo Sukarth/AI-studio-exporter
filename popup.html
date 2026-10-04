@@ -71,6 +71,13 @@
       <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4.5 12h15"></path><path d="m13.5 6 6 6-6 6"></path>
       </symbol>
+      <!-- Lucide's globe, drawn at the same stroke weight as the settings gear
+           beside it, so the three header icons read as one set. -->
+      <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9.5"></circle>
+        <path d="M2.5 12h19"></path>
+        <path d="M12 2.5a14.5 14.5 0 0 1 0 19 14.5 14.5 0 0 1 0-19z"></path>
+      </symbol>
       <!-- The GitHub mark is a solid glyph, not an outline: it is a logo and
            redrawing it as a stroke would make it something else. -->
       <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
@@ -83,6 +90,10 @@
     <div class="pop-head">
       <h1>AI Studio Exporter</h1>
       <span class="tools">
+        <a id="siteLink" class="icon-btn" href="https://exportaistudio.vercel.app"
+           target="_blank" rel="noopener noreferrer" title="Website and docs" aria-label="Website and docs">
+          <svg><use href="#i-globe"></use></svg>
+        </a>
         <a id="githubLink" class="icon-btn" href="https://github.com/Sukarth/AI-studio-exporter"
            target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View on GitHub">
           <svg><use href="#i-github"></use></svg>

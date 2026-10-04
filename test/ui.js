@@ -272,6 +272,20 @@ async function main() {
       }
     });
 
+    await test('the popup links to the website, left of GitHub', async () => {
+      const popup = await context.newPage();
+      try {
+        await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+        await popup.waitForSelector('#siteLink');
+        assert.strictEqual(await popup.getAttribute('#siteLink', 'href'), 'https://exportaistudio.vercel.app');
+        assert.strictEqual(await popup.getAttribute('#siteLink', 'target'), '_blank');
+        const order = await popup.$$eval('.pop-head .tools > *', (nodes) => nodes.map((n) => n.id));
+        assert.deepStrictEqual(order, ['siteLink', 'githubLink', 'settingsBtn']);
+      } finally {
+        await popup.close();
+      }
+    });
+
     await test('resetting restores every default', async () => {
       await options.click('#resetBtn');
       // The confirm is the extension's own dialog now, not the browser's.
