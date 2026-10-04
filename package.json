@@ -7,6 +7,7 @@
     "test": "node test/run.js && node test/attachments.js && node test/license.js && node test/batch.js && node test/documents.js && node test/badge.js",
     "build": "node build.js",
     "build:watch": "node build.js --watch",
+    "package": "node package.js",
     "test:core": "node test/run.js",
     "test:ui": "node test/ui.js",
     "test:ui:export": "node test/ui-export.js",

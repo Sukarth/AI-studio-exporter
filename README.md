@@ -142,11 +142,9 @@ CSV and JSONL exports skip the folder structure and produce one dataset file for
 
 | | |
 |---|---|
-| `activeTab`, `scripting` | Read the AI Studio tab you are on |
-| `downloads` | Save the export |
 | `storage` | Remember your settings and licence |
 | `alarms` | Scheduled backups |
-| `host_permissions` | `aistudio.google.com`, and `api.polar.sh` for the one-time licence check |
+| `host_permissions` | `aistudio.google.com`, to read the conversation you are on; `api.polar.sh`, for the licence check |
 
 ## Troubleshooting
 

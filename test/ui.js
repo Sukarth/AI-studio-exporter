@@ -33,6 +33,10 @@ const os = require('os');
 const assert = require('assert');
 
 const ROOT = path.join(__dirname, '..');
+// The extension under test: the source tree by default, or an unpacked store
+// package (npm run package -- --check sets this), so the tests can prove the
+// ZIP that gets uploaded works, not just the folder it was built from.
+const EXTENSION = process.env.AISE_EXTENSION_DIR || ROOT;
 
 let chromium;
 try {
@@ -88,7 +92,7 @@ async function main() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aise-ui-'));
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false,
-    args: [`--disable-extensions-except=${ROOT}`, `--load-extension=${ROOT}`],
+    args: [`--disable-extensions-except=${EXTENSION}`, `--load-extension=${EXTENSION}`],
   });
 
   try {

@@ -1,12 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "AI Studio Exporter",
+  "name": "AI Studio Exporter: Fully Open Source",
   "version": "2.0.0",
-  "description": "Export conversations from Google AI Studio with all media attachments and chat history",
+  "description": "Export Google AI Studio chats or your whole library, with the real attachments. Nine formats. MIT licensed, paid features too.",
   "permissions": [
-    "activeTab",
-    "scripting",
-    "downloads",
     "storage",
     "alarms"
   ],
@@ -16,6 +13,7 @@
     "https://api.polar.sh/*"
   ],
   "action": {
+    "default_title": "AI Studio Exporter",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "images/icon16.png",

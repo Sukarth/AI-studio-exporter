@@ -53,6 +53,13 @@ minutes of automated scrolling and now takes under a second.
   heading.
 - Exported files no longer use emoji. Role headings are plain text and
   attachments carry an `Attachment:` prefix; the HTML export uses inline SVG.
+- **Fewer permissions.** `activeTab`, `scripting` and `downloads` are gone:
+  nothing called `chrome.scripting`, the host permission already covers the AI
+  Studio tab, and exports save through the page rather than `chrome.downloads`.
+  What remains is `storage`, `alarms` and the two hosts, and installing no
+  longer asks to "Manage your downloads".
+- The store name is "AI Studio Exporter: Fully Open Source". The toolbar
+  tooltip and the popup still say "AI Studio Exporter".
 
 ### Fixed
 
