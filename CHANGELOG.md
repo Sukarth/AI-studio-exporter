@@ -71,6 +71,11 @@ minutes of automated scrolling and now takes under a second.
   Word refuses to open it.
 - The CSV header is emitted once per library export rather than once per
   conversation.
+- Windows Explorer could refuse a library archive as "invalid" while other
+  tools opened it: one attachment with a 218-character name put a path at
+  Windows' 260-character limit. Paths inside archives are now capped (folders
+  at 60 characters, attachments at 80, extensions kept), well clear of it
+  even after the extract folder is added.
 
 ## [1.0.1] - 2026-02-19
 

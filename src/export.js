@@ -44,6 +44,47 @@
     return WINDOWS_RESERVED.test(cleaned) ? cleaned + '-export' : cleaned;
   }
 
+  /**
+   * Path budget. Windows Explorer's built-in zip support rejects a whole
+   * archive as "invalid" when any entry path reaches 260 characters
+   * (MAX_PATH); WinRAR and 7-Zip do not, which is how a real library export
+   * with one 218-character attachment name came to open everywhere except
+   * Explorer. Extracting also has to fit the destination folder in the same
+   * 260. So every part of a path is capped where it is made:
+   *
+   *   <folder, 60> (<id>-<n>) / attachments / <file, 80>
+   *
+   * which tops out near 165 characters inside the archive and leaves room for
+   * C:\Users\<name>\Downloads\ai-studio-library-<stamp>\ in front of it.
+   */
+  const MAX_FILE_NAME = 80;
+  const MAX_FOLDER_NAME = 60;
+
+  /**
+   * Cut text to `max` characters, counted in code points so an emoji or an
+   * accented letter is never split, and drop whatever trailing space, dot or
+   * dash the cut leaves: Windows strips those, so a name ending in one would
+   * not be the name the archive says.
+   */
+  function clip(text, max) {
+    const chars = Array.from(text);
+    if (chars.length <= max) return text;
+    return chars.slice(0, max).join('').replace(/[\s.-]+$/, '');
+  }
+
+  /** Shorten a filename to `max` characters, keeping its extension intact. */
+  function fitFilename(name, max) {
+    if (Array.from(name).length <= max) return name;
+    const ext = (/\.[^.\s]{1,8}$/.exec(name) || [''])[0];
+    const stem = clip(name.slice(0, name.length - ext.length), max - ext.length);
+    return (stem || 'attachment') + ext;
+  }
+
+  /** A conversation title as a folder name inside a library archive. */
+  function folderName(title) {
+    return clip(safeFilename(title, 'conversation'), MAX_FOLDER_NAME) || 'conversation';
+  }
+
   function timestampSlug(ms) {
     return new Date(ms).toISOString().replace(/[:.]/g, '-').slice(0, 19);
   }
@@ -69,10 +110,14 @@
       for (const part of turn.parts) {
         if (!part.buffer && !part.dataBase64) continue;
 
-        let name = AISE.attachments.chooseFilename(part.name, part.mimeType, null);
+        // Capped here, where the archive path is made, rather than in the
+        // attachment's recorded name: the JSON export still reports the name
+        // Drive gave it. The " (n)" for a collision fits inside the cap too.
+        const name = fitFilename(AISE.attachments.chooseFilename(part.name, part.mimeType, null), MAX_FILE_NAME);
         let candidate = name;
         for (let n = 2; used.has(candidate.toLowerCase()); n++) {
-          candidate = name.replace(/(\.[^.]+)?$/, (ext) => ` (${n})${ext || ''}`);
+          const suffix = ` (${n})`;
+          candidate = fitFilename(name, MAX_FILE_NAME - suffix.length).replace(/(\.[^.\s]{1,8})?$/, (ext) => `${suffix}${ext || ''}`);
         }
         used.add(candidate.toLowerCase());
 
@@ -238,6 +283,7 @@
     triggerDownload,
     currentPromptId,
     safeFilename,
+    folderName,
     buildBaseName,
     planAssets,
   };

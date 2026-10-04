@@ -72,7 +72,9 @@
   function makeFolderNamer() {
     const used = new Set();
     return (conversation) => {
-      const base = AISE.exporter.safeFilename(conversation.title, 'conversation');
+      // Shortened before the collision check, so two long titles that share
+      // their first 60 characters are told apart rather than merged.
+      const base = AISE.exporter.folderName(conversation.title);
       let name = base;
       if (used.has(name.toLowerCase())) name = `${base} (${conversation.id.slice(0, 6)})`;
       let n = 2;

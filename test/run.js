@@ -575,6 +575,34 @@ test('asset planning de-duplicates colliding attachment names', () => {
   assert.ok(paths.every((p) => p.startsWith('attachments/')));
 });
 
+// Found on a real library export: an attachment named with 218 characters put
+// one entry at 260, and Windows Explorer rejected the whole archive as
+// "invalid" (WinRAR opened it). Explorer's zip support fails at MAX_PATH.
+test('asset planning keeps attachment names short enough for Windows', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const long = `${'It should be noted that '.repeat(9)}end .png`; // 220 characters
+  const parts = c.turns.flatMap((t) => t.parts);
+  parts.forEach((p) => { p.name = long; p.mimeType = 'image/png'; p.buffer = new ArrayBuffer(4); });
+
+  const { files } = planAssets(c);
+  const paths = files.map((f) => f.path);
+  for (const p of paths) {
+    const name = p.slice('attachments/'.length);
+    assert.ok(Array.from(name).length <= 80, `${name.length} characters: ${name}`);
+    assert.ok(name.endsWith('.png'), `the extension survives: ${name}`);
+    assert.ok(!/[\s.-]\.png$/.test(name), `no dangling space or dot before the extension: ${name}`);
+  }
+  assert.strictEqual(new Set(paths).size, paths.length, 'still unique after shortening');
+});
+
+test('shortening a name never splits a character', () => {
+  const c = AISE.decode.decodeConversation(wirePrompt());
+  const part = c.turns.flatMap((t) => t.parts)[0];
+  Object.assign(part, { name: `${'😀'.repeat(100)}.png`, mimeType: 'image/png', buffer: new ArrayBuffer(4) });
+  const [file] = planAssets(c).files;
+  assert.ok(!/[\uD800-\uDFFF](?![\uDC00-\uDFFF])/.test(file.path.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')), 'no lone surrogate');
+});
+
 test('asset planning skips parts that have no bytes', () => {
   const c = AISE.decode.decodeConversation(wirePrompt());
   // Only the inline attachment carries data; the drive-referenced one does not.
@@ -857,6 +885,24 @@ test('folder naming disambiguates identical titles', () => {
   assert.strictEqual(first, 'Alpha');
   assert.notStrictEqual(second, first, 'second Alpha must not collide');
   assert.ok(second.includes('ccc333'), 'disambiguated with the id');
+});
+
+test('library paths fit inside Windows MAX_PATH with room for the extract folder', () => {
+  const name = makeFolderNamer();
+  const title = 'Branching discussion about '.repeat(8); // 216 characters
+  const first = name({ title, id: 'aaa111aaa' });
+  // Same first 60 characters: shortening must not merge two conversations.
+  const second = name({ title: `${title} and more`, id: 'bbb222bbb' });
+  assert.ok(Array.from(first).length <= 60, `${first.length}: ${first}`);
+  assert.notStrictEqual(second.toLowerCase(), first.toLowerCase(), 'shortened names still distinct');
+  assert.ok(!/[\s.-]$/.test(first), 'no trailing space, dot or dash, which Windows strips');
+
+  // The longest entry a library can produce: folder, attachments/, an 80
+  // character file. Explorer extracts into
+  // C:\Users\<name>\Downloads\ai-studio-library-<stamp>\ (about 70 characters),
+  // and the total has to stay under 260.
+  const longest = `${second}/attachments/${'x'.repeat(76)}.png`;
+  assert.ok(longest.length + 70 < 260, `worst case ${longest.length + 70}`);
 });
 
 test('folder naming sanitises titles into safe paths', () => {

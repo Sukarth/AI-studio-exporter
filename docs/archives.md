@@ -133,5 +133,19 @@ Windows are removed, the result is truncated to 120 characters, and names that
 collide with Windows reserved device names (`CON`, `PRN`, `NUL`, `AUX`, `COM1`…)
 get an `-export` suffix. An empty result falls back to `conversation`.
 
+Inside an archive, names are shorter still, so that no path gets near Windows'
+260-character limit. Windows Explorer refuses to open a ZIP at all if any one
+path inside it reaches that limit, and extracting has to fit the destination
+folder within it too.
+
+| Name | Longest |
+| --- | --- |
+| A conversation's folder, in a library export | 60 characters, plus a short id if two titles collide |
+| An attachment | 80 characters, extension kept, including any ` (2)` |
+
+A name cut short loses the end of its text, never its extension, and never
+ends in a space, dot or dash, which Windows would strip. The JSON export's
+`name` field still records the attachment's full original name.
+
 The timestamp is the export time in UTC, ISO 8601 with `:` and `.` replaced by
 `-`, which sorts correctly in a file listing.
