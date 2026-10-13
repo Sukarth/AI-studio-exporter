@@ -5,11 +5,14 @@ All notable changes to the AI Studio Exporter extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - unreleased
+## [2.0.0] - 2026-10-15
 
 A rewrite. Version 1 scrolled the page and read what it found; version 2 talks
 to AI Studio's own API. A 200-message conversation took about two and a half
 minutes of automated scrolling and now takes under a second.
+
+The first release on the Chrome Web Store:
+https://chromewebstore.google.com/detail/ai-studio-exporter-fully/jggdlefieblocdjkhihbfihdknbdhhce
 
 ### Added
 
@@ -38,6 +41,7 @@ minutes of automated scrolling and now takes under a second.
   dialogs and the overlay drawn over AI Studio.
 - **Documentation** under [docs/](docs/README.md): every format, every JSON,
   JSONL and CSV field, what lands in a `.zip`, and what each setting removes.
+  Also available on the new site: https://exportaistudio.vercel.app/docs/
 - **Tests**: a dependency-free Node suite plus end-to-end runs against a real
   Chrome, including a full export and a scheduled backup fired by a real alarm.
 

@@ -34,12 +34,12 @@ Pull requests are the best way to propose changes to the codebase. We actively w
 
 ### Running the extension
 
-No install step is needed to run or hack on the extension:
+No install step is needed to run or develop the extension:
 
 1. Clone the repo.
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**
    and select the repository folder.
-3. After changing a file, hit reload on the extension card, then reload the
+3. After changing a file, hit reload on the extension card in the browser's extensions page, then reload the
    AI Studio tab so content scripts re-inject.
 
 To confirm the content script is live on a page, check for the
