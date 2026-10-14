@@ -173,7 +173,7 @@ async function check(archive) {
     }
     console.log(`\nChecking the package, unpacked at ${dir}`);
     const failed = [];
-    for (const suite of ['test/ui.js', 'test/ui-export.js', 'test/ui-alarm.js']) {
+    for (const suite of ['test/ui.js', 'test/ui-export.js', 'test/ui-fallback.js', 'test/ui-alarm.js']) {
       console.log(`\n${suite}`);
       const run = spawnSync(process.execPath, [suite], {
         cwd: ROOT,

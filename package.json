@@ -11,7 +11,8 @@
     "test:core": "node test/run.js",
     "test:ui": "node test/ui.js",
     "test:ui:export": "node test/ui-export.js",
-    "test:all": "npm test && npm run test:ui && npm run test:ui:export && npm run test:ui:alarm",
+    "test:ui:fallback": "node test/ui-fallback.js",
+    "test:all": "npm test && npm run test:ui && npm run test:ui:export && npm run test:ui:fallback && npm run test:ui:alarm",
     "test:ui:alarm": "node test/ui-alarm.js",
     "test:badge": "node test/badge.js"
   },
