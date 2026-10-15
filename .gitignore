@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Build outputs
 dist/
@@ -31,3 +30,8 @@ yarn-error.log*
 # Archives (except the final extension package)
 *.zip
 !ai-studio-exporter-*.zip
+
+# vendor/ holds the committed build output - intentionally tracked
+
+# Locally generated sample exports, for eyeballing format changes
+samples/

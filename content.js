@@ -1,773 +1,736 @@
 /***
- * Content script for AI Studio Exporter Extension
- * This script runs in the page context and extracts conversation data from Google AI Studio to be exported
+ * Content script for the AI Studio Exporter.
+ *
+ * Two responsibilities:
+ *   1. The progress overlay and the message channel to the popup.
+ *   2. A DOM-scraping extractor, used only when the API path fails.
+ *
+ * Scraping is the fallback, not the primary route. It is slow: every turn has
+ * to be scrolled into view and given time to render, and it can only see what
+ * the page draws, so model settings, token counts and timestamps are lost. It
+ * exists because the API it replaces is undocumented and could change without
+ * notice, and a degraded export beats no export.
  *
  * @author Sukarth Acharya
- * @version 1.0.1
  * @license MIT
  * @repository https://github.com/sukarth/ai-studio-exporter
  */
 
-(function () {
+(function (root) {
   'use strict';
 
-  // Configuration
-  const CONFIG = {
-    ELEMENT_LOAD_DELAY: 700, // Delay in ms for elements to load
-  };
+  const AISE = (root.AISE = root.AISE || {});
 
-  // Global state
+  const CONFIG = { ELEMENT_LOAD_DELAY: 700 };
+  const ALLOWED_ACTIONS = new Set(['export', 'exportLibrary', 'getStatus', 'cancel']);
+
   let isExporting = false;
   let shouldCancel = false;
-  const ALLOWED_ACTIONS = new Set(['export', 'getStatus', 'cancel']);
-  console.log('AI Studio Exporter content script loaded');
 
-  // Utility function to sleep/wait
-  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // Create and show loading overlay that blocks user input
-  function showLoadingOverlay() {
-    // Create overlay container
-    const overlay = document.createElement('div');
-    overlay.id = 'ai-studio-export-overlay';
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.65);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 999999;
-      backdrop-filter: blur(8px);
-      pointer-events: all;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    `;
+  // --- progress state -----------------------------------------------------
 
-    // Create loading content
-    const content = document.createElement('div');
-    content.style.cssText = `
-      background: #25262b;
-      padding: 40px;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-      text-align: center;
-      max-width: 400px;
-      width: 90%;
-      border: 1px solid #2c2e33;
-      color: #e9ecef;
-    `;
+  /**
+   * What the export is doing right now.
+   *
+   * Two things read this: the injected overlay, and the popup, which polls for
+   * it so that reopening mid-export shows live progress rather than the word
+   * "exporting". Keeping one record means they can never disagree.
+   *
+   * `tone` is 'accent' normally, 'warn' once the API path has been abandoned,
+   * and 'muted' while a cancellation is settling.
+   */
+  let progress = null;
 
-    // Loading spinner
-    const spinner = document.createElement('div');
-    spinner.style.cssText = `
-      width: 50px;
-      height: 50px;
-      border: 3px solid rgba(102, 126, 234, 0.2);
-      border-top: 3px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 24px;
-    `;
+  const emptyProgress = () => ({
+    stage: 'Starting',
+    detail: '',
+    done: 0,
+    total: 0,
+    tone: 'accent',
+    note: null,
+    failed: 0,
+  });
 
-    // Add spinner animation to head
-    if (!document.querySelector('#ai-studio-export-spinner-style')) {
+  // Counts arrive inside the stage text ("Downloading attachments… (3/7)") or
+  // as a detail of their own ("128 / 312"). Reading both means no call site
+  // has to change to feed the progress bar.
+  const COUNT = /(\d+)\s*\/\s*(\d+)/;
+
+  function setProgress(message, detail) {
+    if (!progress) progress = emptyProgress();
+
+    const source = COUNT.exec(detail || '') || COUNT.exec(message || '');
+    if (source) {
+      progress.done = Number(source[1]);
+      progress.total = Number(source[2]);
+    }
+
+    if (message) {
+      // The count belongs on the mono line, not in the sentence.
+      progress.stage = message.replace(/\s*\(?\d+\s*\/\s*\d+\)?/, '').replace(/[…:]\s*$/, '').trim();
+      const failures = /\((\d+) failed\)/.exec(message);
+      progress.failed = failures ? Number(failures[1]) : progress.failed;
+      progress.stage = progress.stage.replace(/\s*\(\d+ failed\)/, '').trim();
+    }
+    if (detail && !source) progress.detail = detail;
+    else if (source) progress.detail = detail && !COUNT.test(detail) ? detail : '';
+
+    paintOverlay();
+  }
+
+  // --- progress overlay ---------------------------------------------------
+
+  /**
+   * The overlay's own copy of the design tokens.
+   *
+   * It is injected into a document we do not control, so it cannot link
+   * theme.css and cannot inherit anything. Every token below that theme.css
+   * also declares must hold the same value; test/run.js compares the two and
+   * fails on drift, which is the only thing keeping this copy honest. Scoping
+   * them to #aise-overlay rather than :root also means we never touch a
+   * variable AI Studio might be using itself.
+   */
+  const OVERLAY_CSS = `
+    @keyframes aise-spin { to { transform: rotate(360deg); } }
+    @keyframes aise-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(333%); } }
+    #aise-overlay {
+      --scrim: rgba(8,9,11,.72);
+      --raised: #16181c; --line-card: #262931; --line: #2b2e36; --track: #26282f;
+      --text: #e7e8ea; --dim: #8f949c; --dimmer: #6f757d; --disabled-ink: #5c6169;
+      --accent: #4f9dfa; --accent-soft: #9cc9fd; --accent-20: rgba(79,157,250,.2);
+      --accent-55: rgba(79,157,250,.55);
+      --warn: #d9a34a; --warn-label: #e0be86; --warn-body: #cbbfa6;
+      --warn-10: rgba(217,163,74,.1); --warn-20: rgba(217,163,74,.2);
+      --err: #e8736b; --err-label: #f0a49e;
+      --err-10: rgba(232,115,107,.1); --err-16: rgba(232,115,107,.16);
+      --err-18: rgba(232,115,107,.18); --err-30: rgba(232,115,107,.3);
+      --track-muted: #4b4f57; --muted-20: rgba(143,148,156,.2);
+      --lift: 0 24px 60px rgba(0,0,0,.5);
+    }
+    /* Written by the export, from the extension's own theme setting rather
+       than from AI Studio's, which the user may well have set differently. */
+    #aise-overlay[data-theme='light'] {
+      --scrim: rgba(20,22,26,.35);
+      --raised: #ffffff; --line-card: #e3e5ea; --line: #d1d5dd; --track: #e3e5ea;
+      --text: #14161a; --dim: #666c77; --dimmer: #858b96; --disabled-ink: #a3a8b2;
+      --accent: #1668d6; --accent-soft: #1257b4; --accent-20: rgba(22,104,214,.18);
+      --accent-55: rgba(22,104,214,.45);
+      --warn: #a76a12; --warn-label: #8a5810; --warn-body: #4d4232;
+      --warn-10: rgba(167,106,18,.08); --warn-20: rgba(167,106,18,.2);
+      --err: #cf3a2f; --err-label: #b02c22;
+      --err-10: rgba(207,58,47,.07); --err-16: rgba(207,58,47,.12);
+      --err-18: rgba(207,58,47,.15); --err-30: rgba(207,58,47,.28);
+      --track-muted: #b0b5be; --muted-20: rgba(102,108,119,.2);
+      --lift: 0 24px 60px rgba(20,22,30,.18);
+    }
+    #aise-overlay {
+      position: fixed; inset: 0; z-index: 2147483000;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--scrim); backdrop-filter: blur(8px);
+      font-family: Manrope, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #aise-overlay .aise-card {
+      width: 340px; padding: 26px; text-align: center;
+      background: var(--raised); border: 1px solid var(--line-card); border-radius: 16px;
+      box-shadow: var(--lift); color: var(--text);
+    }
+    #aise-overlay .aise-spin {
+      width: 36px; height: 36px; margin: 0 auto 16px; border-radius: 50%;
+      border: 3px solid var(--accent-20); border-top-color: var(--accent);
+      animation: aise-spin 1s linear infinite;
+    }
+    #aise-overlay.is-warn .aise-spin { border-color: var(--warn-20); border-top-color: var(--warn); }
+    #aise-overlay.is-muted .aise-spin { border-color: var(--muted-20); border-top-color: var(--dim); }
+    #aise-overlay .aise-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; letter-spacing: -.01em; }
+    #aise-overlay .aise-stage {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: 13px; color: var(--dim); min-height: 20px;
+    }
+    #aise-overlay.is-warn .aise-stage { color: var(--warn-label); }
+    #aise-overlay .aise-failed {
+      font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+      background: var(--err-16); color: var(--err-label);
+    }
+    #aise-overlay .aise-bar {
+      height: 4px; border-radius: 999px; background: var(--track);
+      margin: 16px 0 10px; overflow: hidden;
+    }
+    #aise-overlay .aise-bar > i { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
+    #aise-overlay.is-warn .aise-bar > i { background: var(--warn); }
+    #aise-overlay.is-muted .aise-bar > i { background: var(--track-muted); }
+    #aise-overlay .aise-bar.is-sweep > i {
+      width: 30%; background: var(--accent-55); animation: aise-sweep 1.4s ease-in-out infinite;
+    }
+    #aise-overlay .aise-count {
+      font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+      font-size: 11.5px; color: var(--dimmer); margin-bottom: 16px; min-height: 17px;
+    }
+    #aise-overlay.is-accent .aise-count { color: var(--accent-soft); }
+    #aise-overlay.is-warn .aise-count { color: var(--warn-label); }
+    #aise-overlay .aise-note {
+      margin: 14px 0 12px; padding: 9px 11px; border-radius: 9px; text-align: left;
+      background: var(--warn-10); font-size: 11.5px; line-height: 1.45; color: var(--warn-body);
+    }
+    #aise-overlay .aise-cancel {
+      padding: 9px 18px; border-radius: 8px; font-family: inherit;
+      font-size: 12.5px; font-weight: 600; cursor: pointer;
+      background: var(--err-10); border: 1px solid var(--err-30); color: var(--err);
+    }
+    #aise-overlay .aise-cancel:hover { background: var(--err-18); }
+    #aise-overlay .aise-cancel:disabled {
+      background: transparent; border-color: var(--line); color: var(--disabled-ink); cursor: not-allowed;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #aise-overlay .aise-spin, #aise-overlay .aise-bar > i { animation: none; }
+    }
+  `;
+
+  /**
+   * The theme, kept warm.
+   *
+   * The overlay goes up before the export's own settings read has returned, so
+   * asking storage at that point would paint dark and correct itself a frame
+   * later. Reading it once at injection and following changes costs nothing
+   * and is right every time after the first paint of the page.
+   */
+  let themePreference = 'system';
+  const resolvedTheme = () => {
+    if (themePreference === 'light' || themePreference === 'dark') return themePreference;
+    try {
+      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    } catch (_) {
+      return 'dark';
+    }
+  };
+  try {
+    chrome.storage.sync.get({ theme: 'system' }, (stored) => {
+      if (stored && stored.theme) themePreference = stored.theme;
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'sync' && changes.theme) themePreference = changes.theme.newValue || 'system';
+    });
+  } catch (_) {
+    // No storage access means the system default, which is a fine answer.
+  }
+
+  function showLoadingOverlay(heading) {
+    if (document.getElementById('aise-overlay')) return;
+
+    if (!document.getElementById('aise-overlay-style')) {
       const style = document.createElement('style');
-      style.id = 'ai-studio-export-spinner-style';
-      style.textContent = `
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `;
+      style.id = 'aise-overlay-style';
+      style.textContent = OVERLAY_CSS;
       document.head.appendChild(style);
     }
 
-    // Title
-    const title = document.createElement('h2');
-    title.textContent = 'Exporting Conversation...';
-    title.style.cssText = `
-      margin: 0 0 12px 0;
-      color: #fff;
-      font-size: 20px;
-      font-weight: 600;
-    `;
+    const title = heading || 'Exporting conversation';
+    const overlay = document.createElement('div');
+    overlay.id = 'aise-overlay';
+    overlay.className = 'is-accent';
+    // On the element rather than in the class list, because paintOverlay
+    // rewrites className on every tick.
+    overlay.dataset.theme = resolvedTheme();
 
-    // Status message
-    const message = document.createElement('p');
-    message.id = 'ai-studio-export-status';
-    message.textContent = 'Initializing export process...';
-    message.style.cssText = `
-      margin: 0;
-      color: #a5a5a5;
-      font-size: 14px;
-      line-height: 1.6;
-    `;
+    // Built as nodes rather than one innerHTML string: the heading is a
+    // parameter, and a template that interpolates one is a template someone
+    // eventually passes user text to.
+    const card = document.createElement('div');
+    card.className = 'aise-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-live', 'polite');
+    card.setAttribute('aria-label', title);
+    card.innerHTML =
+      '<div class="aise-spin"></div>' +
+      '<div class="aise-title"></div>' +
+      '<div class="aise-stage"><span class="aise-stage-text"></span></div>' +
+      '<div class="aise-bar is-sweep"><i></i></div>' +
+      '<div class="aise-count">&nbsp;</div>' +
+      '<button class="aise-cancel" type="button">Cancel export</button>';
+    card.querySelector('.aise-title').textContent = `${title}…`;
+    overlay.appendChild(card);
 
-    // Progress indicator
-    const progressContainer = document.createElement('div');
-    progressContainer.style.cssText = `
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #2c2e33;
-    `;
-
-    const progressText = document.createElement('div');
-    progressText.id = 'ai-studio-export-progress';
-    progressText.textContent = 'Starting...';
-    progressText.style.cssText = `
-      color: #667eea;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 20px;
-    `;
-
-    // Cancel button
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancel Export';
-    cancelBtn.style.cssText = `
-      background: transparent;
-      border: 1px solid #c92a2a;
-      color: #ff8787;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-weight: 500;
-    `;
-    cancelBtn.onmouseover = () => {
-      cancelBtn.style.background = 'rgba(201, 42, 42, 0.1)';
-    };
-    cancelBtn.onmouseout = () => {
-      cancelBtn.style.background = 'transparent';
-    };
-    cancelBtn.onclick = () => {
-      shouldCancel = true;
-      cancelBtn.textContent = 'Cancelling...';
-      cancelBtn.disabled = true;
-      cancelBtn.style.opacity = '0.7';
-      cancelBtn.style.cursor = 'not-allowed';
-    };
-
-    progressContainer.appendChild(progressText);
-    progressContainer.appendChild(cancelBtn);
-
-    // Assemble content
-    content.appendChild(spinner);
-    content.appendChild(title);
-    content.appendChild(message);
-    content.appendChild(progressContainer);
-
-    // Assemble overlay
-    overlay.appendChild(content);
-
-    // Block all user interactions
-    overlay.addEventListener('mousedown', (e) => e.stopPropagation());
-    overlay.addEventListener('mouseup', (e) => e.stopPropagation());
-    overlay.addEventListener('click', (e) => e.stopPropagation());
-    overlay.addEventListener('scroll', (e) => e.preventDefault());
+    // Swallow interaction so a stray click can't disturb the page mid-export.
+    for (const type of ['mousedown', 'mouseup', 'click', 'keydown', 'keyup']) {
+      overlay.addEventListener(type, (e) => e.stopPropagation());
+    }
     overlay.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
-    overlay.addEventListener('keydown', (e) => e.preventDefault());
-    overlay.addEventListener('keyup', (e) => e.preventDefault());
+
+    card.querySelector('.aise-cancel').addEventListener('click', (event) => {
+      shouldCancel = true;
+      if (progress) progress.tone = 'muted';
+      const button = event.currentTarget;
+      button.textContent = 'Cancelling…';
+      button.disabled = true;
+      paintOverlay();
+    });
 
     document.body.appendChild(overlay);
-
-    return overlay;
+    paintOverlay();
   }
 
-  // Update loading overlay status
-  function updateLoadingStatus(message, progress) {
-    const statusEl = document.getElementById('ai-studio-export-status');
-    const progressEl = document.getElementById('ai-studio-export-progress');
+  /**
+   * Draw the current progress into the overlay.
+   *
+   * Every element is always present and every one has a reserved height, so
+   * the card is the same size at every stage. The previous version grew and
+   * shrank as stages came and went.
+   */
+  function paintOverlay() {
+    const overlay = document.getElementById('aise-overlay');
+    if (!overlay || !progress) return;
 
-    if (statusEl) {
-      statusEl.textContent = message;
+    overlay.className = `is-${progress.tone}`;
+
+    const stage = overlay.querySelector('.aise-stage');
+    stage.querySelector('.aise-stage-text').textContent = progress.stage || '';
+
+    let chip = stage.querySelector('.aise-failed');
+    if (progress.failed) {
+      if (!chip) {
+        chip = document.createElement('span');
+        chip.className = 'aise-failed';
+        stage.appendChild(chip);
+      }
+      chip.textContent = `${progress.failed} failed`;
+    } else if (chip) {
+      chip.remove();
     }
 
-    if (progressEl && progress) {
-      progressEl.textContent = progress;
+    const bar = overlay.querySelector('.aise-bar');
+    const fill = bar.firstElementChild;
+    if (progress.total) {
+      bar.className = 'aise-bar';
+      fill.style.width = `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%`;
+    } else {
+      bar.className = 'aise-bar is-sweep';
+      fill.style.width = '';
     }
+
+    const parts = [];
+    if (progress.total) parts.push(`${progress.done} / ${progress.total}`);
+    if (progress.detail) parts.push(progress.detail);
+    const count = overlay.querySelector('.aise-count');
+    count.textContent = parts.join(' · ');
+    if (!parts.length) count.innerHTML = '&nbsp;';
+
+    let note = overlay.querySelector('.aise-note');
+    if (progress.note && !note) {
+      note = document.createElement('div');
+      note.className = 'aise-note';
+      overlay.querySelector('.aise-card').insertBefore(note, overlay.querySelector('.aise-cancel'));
+    }
+    if (note) note.textContent = progress.note || '';
   }
 
-  // Hide and remove loading overlay
   function hideLoadingOverlay() {
-    const overlay = document.getElementById('ai-studio-export-overlay');
-    if (overlay) {
-      overlay.style.opacity = '0';
-      overlay.style.transition = 'opacity 0.3s ease';
-      setTimeout(() => overlay.remove(), 300);
-    }
+    const overlay = document.getElementById('aise-overlay');
+    if (!overlay) return;
+    overlay.style.transition = 'opacity .3s ease';
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 300);
   }
 
-  // Extract user message text from ms-text-chunk element
-  function extractUserMessageText(chatTurn) {
-    const textChunk = chatTurn.querySelector('ms-text-chunk');
-    if (textChunk) {
-      return textChunk.innerText.trim();
-    }
-    return '';
-  }
+  // --- raw-mode toggle ----------------------------------------------------
 
-  // Extract model message text from ms-text-chunk element
-  function extractModelMessageText(chatTurn) {
-    const textChunk = chatTurn.querySelector('ms-text-chunk');
-    if (textChunk) {
-      return textChunk.innerText.trim();
-    }
-    return '';
-  }
+  const getMoreActionsButton = () => document.querySelector('button[aria-label="View more actions"]');
+  const getRawOutputToggleButton = () => document.querySelector('button[aria-label="Toggle viewing raw output"]');
 
-  // Convert blob URL to base64
-  async function blobUrlToBase64(blobUrl) {
-    try {
-      const response = await fetch(blobUrl);
-      const blob = await response.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Error converting blob to base64:', error);
-      return null;
-    }
-  }
-
-  // Extract image from user message
-  async function extractUserImage(chatTurn) {
-    const imgElement = chatTurn.querySelector('img.loaded-image');
-    if (!imgElement) {
-      return null;
-    }
-
-    const src = imgElement.getAttribute('src');
-    const alt = imgElement.getAttribute('alt') || 'image.jpg';
-
-    if (src && src.startsWith('blob:')) {
-      const base64Data = await blobUrlToBase64(src);
-      return {
-        alt: alt,
-        base64: base64Data,
-        filename: alt
-      };
-    }
-
-    return null;
-  }
-
-  // Extract attachment from user message
-  async function extractUserAttachment(chatTurn, settings) {
-    const fileChunk = chatTurn.querySelector('ms-file-chunk');
-    if (!fileChunk) {
-      return null;
-    }
-
-    // Get file name/text
-    let fileName = 'attachment';
-    if (settings.scrapeAttachmentTitle) {
-      const nameSpan = fileChunk.querySelector('span');
-      fileName = nameSpan ? nameSpan.innerText.trim() : 'attachment';
-    }
-
-    // Get file size/tokens info
-    let fileInfo = '';
-    if (settings.scrapeAttachmentSize) {
-      const fileChunkContainer = fileChunk.querySelector('.file-chunk-container');
-      if (fileChunkContainer) {
-        const lastChild = fileChunkContainer.lastChild;
-        if (lastChild) {
-          fileInfo = lastChild.innerText || '';
-        }
-      }
-    }
-
-    // Try to get preview image
-    let previewBase64 = null;
-    if (settings.scrapeAttachmentPreview) {
-      const previewImg = fileChunk.querySelector('img');
-      if (previewImg) {
-        const imgSrc = previewImg.getAttribute('src');
-        if (imgSrc) {
-          if (imgSrc.startsWith('blob:')) {
-            // Handle blob URLs
-            previewBase64 = await blobUrlToBase64(imgSrc);
-          } else if (imgSrc.startsWith('http://') || imgSrc.startsWith('https://')) {
-            // Handle HTTP/HTTPS URLs (e.g., Google Drive links)
-            try {
-              const response = await fetch(imgSrc);
-              const blob = await response.blob();
-              previewBase64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-              });
-            } catch (error) {
-              console.error('Error downloading preview image:', error);
-            }
-          }
-        }
-      }
-    }
-
-    return {
-      fileName: fileName,
-      fileInfo: fileInfo,
-      previewBase64: previewBase64
-    };
-  }
-
-  // Extract reasoning text from model message
-  async function extractReasoningText(chatTurn) {
-    // Find the chevron button
-    const chevronButton = Array.from(chatTurn.querySelectorAll('span')).find(
-      span => span.textContent.trim() === 'chevron_right'
-    );
-
-    if (!chevronButton) {
-      return null;
-    }
-
-    // Click to expand
-    chevronButton.click();
-    await sleep(CONFIG.ELEMENT_LOAD_DELAY); // Wait for expansion animation
-
-    // Find the reasoning text
-    const expansionPanel = chatTurn.querySelector('.mat-expansion-panel-body ms-text-chunk');
-    let reasoningText = null;
-
-    if (expansionPanel) {
-      // Get text content and preserve formatting, but remove outer whitespace
-      reasoningText = expansionPanel.textContent.replace(/^\s+/, '').replace(/\s+$/, '');
-    }
-
-    // Click again to collapse
-    chevronButton.click();
-    await sleep(CONFIG.ELEMENT_LOAD_DELAY);
-
-    return reasoningText;
-  }
-
-  // Get settings from storage
-  function getSettings() {
-    return new Promise((resolve) => {
-      chrome.storage.sync.get(
-        AI_STUDIO_DEFAULT_SETTINGS,
-        (settings) => resolve(sanitizeSettings(settings))
-      );
-    });
-  }
-
-  // Process a single chat turn
-  async function processChatTurn(chatTurn, imageCounter, settings) {
-    // Scroll the chat turn into view before processing
-    chatTurn.scrollIntoView();
-    await sleep(CONFIG.ELEMENT_LOAD_DELAY); // Wait for scroll to complete
-
-    const turnContainer = chatTurn.querySelector('[data-turn-role]');
-    if (!turnContainer) {
-      return null;
-    }
-
-    const role = turnContainer.getAttribute('data-turn-role');
-
-    if (role === 'User') {
-      // Check for image first (if enabled)
-      if (settings.scrapeImages) {
-        const imageData = await extractUserImage(chatTurn);
-
-        if (imageData) {
-          return {
-            type: 'user',
-            contentType: 'image',
-            image: imageData
-          };
-        }
-      }
-
-      // Check for attachment (if enabled)
-      if (settings.scrapeAttachments) {
-        const attachmentData = await extractUserAttachment(chatTurn, settings);
-
-        if (attachmentData) {
-          return {
-            type: 'user',
-            contentType: 'attachment',
-            attachment: attachmentData
-          };
-        }
-      }
-
-      // Extract text
-      const text = extractUserMessageText(chatTurn);
-      if (text) {
-        return {
-          type: 'user',
-          contentType: 'text',
-          text: text
-        };
-      }
-
-      // If no text or attachment found, return null
-      return null;
-    } else if (role === 'Model') {
-      // Check for reasoning block (if enabled)
-      if (settings.scrapeReasoning) {
-        const reasoningText = await extractReasoningText(chatTurn);
-
-        if (reasoningText) {
-          return {
-            type: 'model',
-            contentType: 'reasoning',
-            text: reasoningText
-          };
-        }
-      }
-
-      // Extract model response
-      const text = extractModelMessageText(chatTurn);
-      if (text) {
-        return {
-          type: 'model',
-          contentType: 'response',
-          text: text
-        };
-      }
-    }
-
-    return null;
-  }
-
-  // Check if raw mode is already enabled
+  /**
+   * The toggle's own label states which way it will switch, so reading it is
+   * both cheaper and more reliable than the previous approach of serialising
+   * document.body.innerHTML, an operation that grew with conversation length
+   * and ran on every check.
+   */
   function isRawModeEnabled() {
-    return document.body.innerHTML.includes("Show conversation with markdown formatting");
-  }
-
-  function getMoreActionsButton() {
-    return document.querySelector('button[aria-label="View more actions"]');
-  }
-
-  function getRawOutputToggleButton() {
-    return document.querySelector('button[aria-label="Toggle viewing raw output"]');
+    const button = getRawOutputToggleButton();
+    if (!button) return false;
+    return /markdown formatting/i.test(button.textContent || '');
   }
 
   async function ensureMoreActionsMenuOpen() {
-    const moreActionsButton = getMoreActionsButton();
-    if (!moreActionsButton) {
-      throw new Error('Could not find "View more actions" button');
-    }
+    const moreActions = getMoreActionsButton();
+    if (!moreActions) throw new Error('Could not find the "View more actions" button');
 
-    let rawOutputButton = getRawOutputToggleButton();
-    if (rawOutputButton) {
-      return { moreActionsButton, rawOutputButton };
-    }
+    if (getRawOutputToggleButton()) return getRawOutputToggleButton();
 
-    moreActionsButton.click();
+    moreActions.click();
     await sleep(CONFIG.ELEMENT_LOAD_DELAY / 5);
 
-    rawOutputButton = getRawOutputToggleButton();
-    if (!rawOutputButton) {
-      throw new Error('Could not find "Toggle viewing raw output" button');
-    }
-
-    return { moreActionsButton, rawOutputButton };
+    const toggle = getRawOutputToggleButton();
+    if (!toggle) throw new Error('Could not find the "Toggle viewing raw output" button');
+    return toggle;
   }
 
   async function closeMoreActionsMenuIfOpen() {
-    if (!getRawOutputToggleButton()) {
-      return;
-    }
-
-    const moreActionsButton = getMoreActionsButton();
-    if (!moreActionsButton) {
-      return;
-    }
-
-    moreActionsButton.click();
+    if (!getRawOutputToggleButton()) return;
+    const moreActions = getMoreActionsButton();
+    if (!moreActions) return;
+    moreActions.click();
     await sleep(CONFIG.ELEMENT_LOAD_DELAY / 5);
   }
 
-  // Main export function
-  async function exportConversation() {
-    if (isExporting) {
-      return { success: false, message: 'Export already in progress' };
-    }
+  // --- media --------------------------------------------------------------
+
+  const MIME_EXTENSIONS = {
+    'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
+    'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/bmp': 'bmp',
+  };
+
+  /**
+   * Read an image the page has already loaded. Returns the real MIME type from
+   * the blob rather than assuming JPEG, which previously caused every export to
+   * save PNGs under a .jpg extension.
+   */
+  async function readImageElement(img, index) {
+    const src = img.getAttribute('src');
+    if (!src) return null;
 
     try {
-      isExporting = true;
-      shouldCancel = false;
+      const response = await fetch(src);
+      const blob = await response.blob();
+      const buffer = await blob.arrayBuffer();
+      const mimeType = blob.type || 'image/png';
+      const alt = (img.getAttribute('alt') || '').trim();
+      const extension = MIME_EXTENSIONS[mimeType] || 'png';
 
-      // Load settings
-      const settings = await getSettings();
+      return {
+        type: 'image',
+        name: alt && /\.[a-z0-9]{2,5}$/i.test(alt) ? alt : `image-${index}.${extension}`,
+        mimeType,
+        driveId: null,
+        buffer,
+        byteLength: buffer.byteLength,
+        error: null,
+      };
+    } catch (error) {
+      console.warn('[AI Studio Exporter] Could not read image:', error);
+      return null;
+    }
+  }
 
-      // Update config with loaded delay
-      CONFIG.ELEMENT_LOAD_DELAY = settings.loadDelay;
+  /**
+   * Attachments render as a chip with a title and a size, and sometimes a
+   * thumbnail. The page never holds the underlying file, so scraping can only
+   * ever recover the label; the API path is what retrieves real bytes.
+   */
+  async function readAttachmentChunks(turnEl, settings, counter) {
+    const parts = [];
 
-      // Show loading overlay
-      const overlay = showLoadingOverlay();
-      updateLoadingStatus('Enabling raw output mode...', 'Step 1/4: Setup');
+    for (const chunk of turnEl.querySelectorAll('ms-file-chunk')) {
+      let name = 'attachment';
+      if (settings.scrapeAttachmentTitle) {
+        const label = chunk.querySelector('span:not([class*="icon"])');
+        name = (label ? label.innerText : '').trim() || 'attachment';
+      }
 
-      // Step 1: Check initial raw mode state and toggle if needed
-      console.log('Checking raw output mode state...');
-      let initialRawModeEnabled = false;
-      try {
-        const { rawOutputButton } = await ensureMoreActionsMenuOpen();
+      let sizeLabel = '';
+      if (settings.scrapeAttachmentSize) {
+        const container = chunk.querySelector('.file-chunk-container');
+        sizeLabel = ((container && container.lastElementChild && container.lastElementChild.innerText) || '').trim();
+      }
 
-        // Store the initial state (true = already on, false = currently off)
-        initialRawModeEnabled = isRawModeEnabled();
-        console.log(`Initial raw mode state: ${initialRawModeEnabled ? 'ON' : 'OFF'}`);
+      const part = {
+        type: 'file', name, mimeType: null, driveId: null,
+        buffer: null, byteLength: null, sizeLabel,
+        error: 'Only the preview is available when scraping the page',
+      };
 
-        // Toggle raw mode only if it's not already enabled
-        if (!initialRawModeEnabled) {
-          console.log('Toggling raw output mode ON...');
-          rawOutputButton.click();
-          await sleep(CONFIG.ELEMENT_LOAD_DELAY * 5); // Wait for raw output to load (longer delay needed)
-
-          // Verify that raw mode was enabled successfully
-          const rawModeAfterToggle = isRawModeEnabled();
-          console.log(`Raw mode after toggle: ${rawModeAfterToggle ? 'ON' : 'OFF'}`);
-          if (!rawModeAfterToggle) {
-            throw new Error('Failed to enable raw output mode');
+      if (settings.scrapeAttachmentPreview) {
+        const preview = chunk.querySelector('img');
+        if (preview) {
+          const image = await readImageElement(preview, ++counter.value);
+          if (image) {
+            image.name = `preview-${counter.value}-${image.name}`;
+            parts.push(image);
           }
-        } else {
-          console.log('Raw output mode already ON, skipping toggle');
         }
+      }
+
+      parts.push(part);
+    }
+
+    return parts;
+  }
+
+  // --- turn extraction ----------------------------------------------------
+
+  const textOf = (el) => (el ? (el.innerText || '').trim() : '');
+
+  /**
+   * Read one chat turn into normalized turns.
+   *
+   * Returns an array because a single model turn can yield two: its reasoning
+   * and its answer. The previous implementation returned early on finding a
+   * reasoning block, so the answer was discarded; likewise a user message with
+   * both an image and a caption lost the caption. Every piece of content on the
+   * turn is now collected instead of the first match winning.
+   */
+  async function extractTurn(turnEl, settings, counter) {
+    const container = turnEl.querySelector('[data-turn-role]');
+    if (!container) return [];
+
+    const role = container.getAttribute('data-turn-role') === 'Model' ? 'model' : 'user';
+    const turns = [];
+
+    if (role === 'model' && settings.scrapeReasoning) {
+      const reasoning = await extractReasoning(turnEl);
+      if (reasoning) {
+        turns.push(AISE.model.makeTurn('model', reasoning, { isThought: true }));
+      }
+    }
+
+    const parts = [];
+    if (settings.scrapeImages) {
+      // querySelectorAll, not querySelector: a turn may carry several images
+      // and only the first was ever captured before.
+      for (const img of turnEl.querySelectorAll('img.loaded-image')) {
+        const image = await readImageElement(img, ++counter.value);
+        if (image) parts.push(image);
+      }
+    }
+    if (settings.scrapeAttachments) {
+      parts.push(...(await readAttachmentChunks(turnEl, settings, counter)));
+    }
+
+    // The reasoning panel contributes its own ms-text-chunk, so for a model
+    // turn the answer is the last one rather than the first.
+    const chunks = turnEl.querySelectorAll('ms-text-chunk');
+    const answerChunk = role === 'model' && chunks.length > 1 ? chunks[chunks.length - 1] : chunks[0];
+    const text = textOf(answerChunk);
+
+    if (text || parts.length) {
+      const turn = AISE.model.makeTurn(role, text);
+      turn.parts = parts;
+      turns.push(turn);
+    }
+
+    return turns;
+  }
+
+  async function extractReasoning(turnEl) {
+    const chevron = Array.from(turnEl.querySelectorAll('span')).find(
+      (span) => span.textContent.trim() === 'chevron_right'
+    );
+    if (!chevron) return null;
+
+    chevron.click();
+    await sleep(CONFIG.ELEMENT_LOAD_DELAY);
+
+    const panel = turnEl.querySelector('.mat-expansion-panel-body ms-text-chunk');
+    const text = panel ? panel.textContent.replace(/^\s+|\s+$/g, '') : null;
+
+    chevron.click();
+    await sleep(CONFIG.ELEMENT_LOAD_DELAY);
+
+    return text || null;
+  }
+
+  // --- fallback extractor -------------------------------------------------
+
+  /**
+   * Scrape the rendered page into a Conversation. Registered on AISE so the
+   * pipeline in src/export.js can reach it without a circular dependency.
+   */
+  async function domExtract(settings, report, cancelled) {
+    CONFIG.ELEMENT_LOAD_DELAY = settings.loadDelay || CONFIG.ELEMENT_LOAD_DELAY;
+
+    const promptId = AISE.exporter.currentPromptId();
+    const conversation = AISE.model.emptyConversation(promptId, 'dom');
+
+    const titleEl = document.querySelector('.actions.pointer.mode-title');
+    if (titleEl) conversation.title = textOf(titleEl) || conversation.title;
+
+    let restoreRawMode = false;
+    report('Enabling raw output mode…');
+
+    try {
+      const toggle = await ensureMoreActionsMenuOpen();
+      if (!isRawModeEnabled()) {
+        toggle.click();
+        await sleep(CONFIG.ELEMENT_LOAD_DELAY * 5);
+        restoreRawMode = true;
+      }
+    } finally {
+      await closeMoreActionsMenuIfOpen();
+    }
+
+    const turnElements = document.querySelectorAll('ms-chat-turn');
+    if (!turnElements.length) throw new Error('No chat turns found on the page');
+
+    const counter = { value: 0 };
+    for (let i = 0; i < turnElements.length; i++) {
+      if (cancelled && cancelled()) throw new Error('Export cancelled');
+      report('Reading messages from the page…', `${i + 1} / ${turnElements.length}`);
+
+      turnElements[i].scrollIntoView();
+      await sleep(CONFIG.ELEMENT_LOAD_DELAY);
+      conversation.turns.push(...(await extractTurn(turnElements[i], settings, counter)));
+    }
+
+    if (restoreRawMode) {
+      try {
+        (await ensureMoreActionsMenuOpen()).click();
+        await sleep(CONFIG.ELEMENT_LOAD_DELAY);
+      } catch (error) {
+        console.warn('[AI Studio Exporter] Could not restore raw output mode:', error);
       } finally {
-        // Always close the actions menu before continuing export steps.
         await closeMoreActionsMenuIfOpen();
       }
+    }
 
+    return AISE.model.recomputeStats(conversation);
+  }
 
-      if (shouldCancel) throw new Error('Export cancelled by user');
+  AISE.domExtract = domExtract;
 
-      // Step 2: Find all chat turns
-      updateLoadingStatus('Scanning conversation...', 'Step 2/4: Scanning');
-      console.log('Finding chat turns...');
-      const chatTurns = document.querySelectorAll('ms-chat-turn');
-      console.log(`Found ${chatTurns.length} chat turns`);
+  // --- entry point --------------------------------------------------------
 
-      if (chatTurns.length === 0) {
-        throw new Error('No chat turns found');
+  function getSettings() {
+    return new Promise((resolve) => {
+      chrome.storage.sync.get(AI_STUDIO_DEFAULT_SETTINGS, (stored) => resolve(sanitizeSettings(stored)));
+    });
+  }
+
+  /**
+   * Set the toolbar badge. Content scripts cannot reach chrome.action, so the
+   * service worker does it; failures are ignored because a badge that could
+   * not be painted must never take an export down with it.
+   */
+  const setBadge = (state, text, kind) => {
+    try {
+      chrome.runtime.sendMessage(
+        { action: 'status:set', state, text, kind },
+        () => chrome.runtime.lastError
+      );
+    } catch (_) {
+      // Extension context invalidated; the export is about to fail anyway.
+    }
+  };
+
+  /**
+   * Shared wrapper for both export kinds: one at a time, overlay up, overlay
+   * always torn down. `silent` suppresses the overlay for scheduled backups,
+   * which run in a background tab the user is not looking at; the badge is
+   * deliberately not suppressed, because it is the only way an unattended
+   * backup can report that it failed.
+   */
+  async function runExport(request, work) {
+    if (isExporting) return { success: false, message: 'An export is already running' };
+
+    const library = request.action === 'exportLibrary';
+    isExporting = true;
+    shouldCancel = false;
+    progress = emptyProgress();
+    if (!request.silent) showLoadingOverlay(library ? 'Exporting library' : 'Exporting conversation');
+    setBadge('running');
+
+    let downgraded = false;
+    try {
+      const settings = await getSettings();
+      CONFIG.ELEMENT_LOAD_DELAY = settings.loadDelay;
+
+      const requested = request.formatId || request.format || settings.defaultFormat || 'markdown';
+      const resolved = await AISE.license.resolveFormat(requested);
+      const { format, reason } = resolved;
+      downgraded = resolved.downgraded;
+      // A note rather than a status message: it used to be written over the
+      // status line and then overwritten a moment later by the first real
+      // stage, so the one thing worth reading was the one thing that flashed.
+      if (downgraded) {
+        progress.note = reason;
+        paintOverlay();
       }
 
-      if (shouldCancel) throw new Error('Export cancelled by user');
+      const result = await work({
+        settings,
+        formatId: format.id,
+        report: setProgress,
+        shouldCancel: () => shouldCancel,
+        // Fires the moment the API path is abandoned, so the badge and the
+        // overlay can say so while the slow part is still running.
+        onSource: (source) => {
+          if (source === 'dom' && progress && progress.tone !== 'muted') progress.tone = 'warn';
+          paintOverlay();
+          setBadge(source === 'dom' ? 'reading' : 'running');
+        },
+      });
 
-      // Step 3: Process all chat turns
-      updateLoadingStatus('Extracting messages and images...', `Step 3/4: Processing (0/${chatTurns.length})`);
-      const conversationData = [];
-      const images = [];
-      let imageCounter = 0;
-
-      for (let i = 0; i < chatTurns.length; i++) {
-        if (shouldCancel) throw new Error('Export cancelled by user');
-
-        updateLoadingStatus(
-          'Extracting messages and images...',
-          `Step 3/4: Processing (${i + 1}/${chatTurns.length})`
-        );
-        console.log(`Processing turn ${i + 1}/${chatTurns.length}`);
-        const turnData = await processChatTurn(chatTurns[i], imageCounter, settings);
-
-        if (turnData) {
-          if (turnData.contentType === 'image') {
-            imageCounter++;
-            const imageName = `image-${imageCounter}.jpg`;
-            images.push({
-              name: imageName,
-              base64: turnData.image.base64
-            });
-            conversationData.push({
-              type: 'user',
-              contentType: 'image',
-              imageName: imageName
-            });
-          } else if (turnData.contentType === 'attachment') {
-            // Handle attachment
-            const attachment = turnData.attachment;
-            if (attachment.previewBase64) {
-              imageCounter++;
-              const previewName = `image-${imageCounter}.jpg`;
-              images.push({
-                name: previewName,
-                base64: attachment.previewBase64
-              });
-              conversationData.push({
-                type: 'user',
-                contentType: 'attachment',
-                fileName: attachment.fileName,
-                fileInfo: attachment.fileInfo,
-                previewName: previewName
-              });
-            } else {
-              conversationData.push({
-                type: 'user',
-                contentType: 'attachment',
-                fileName: attachment.fileName,
-                fileInfo: attachment.fileInfo,
-                previewName: null
-              });
-            }
-          } else {
-            conversationData.push(turnData);
-          }
-        }
+      if (downgraded && result && result.success) {
+        result.message = `${result.message} · ${reason}`;
       }
-
-      if (shouldCancel) throw new Error('Export cancelled by user');
-
-      // Step 4: Generate Markdown and create ZIP
-      updateLoadingStatus('Creating ZIP file...', 'Step 4/4: Packaging');
-      console.log('Generating markdown...');
-
-      // Get conversation title and token size
-      const titleElement = document.querySelector('.actions.pointer.mode-title');
-      const tokenElement = document.querySelector('.token-container');
-      const conversationTitle = titleElement ? titleElement.innerText.trim() : 'Untitled Conversation';
-      const tokenSize = tokenElement ? tokenElement.innerText.trim() : 'Unknown';
-
-      let markdown = `# **Title:** ${conversationTitle}\n\n`;
-      markdown += `**Token Size:** ${tokenSize}\n\n`;
-      markdown += `Exported on: ${new Date().toLocaleString()}\n\n`;
-      markdown += '---\n\n';
-
-      for (const item of conversationData) {
-        if (item.type === 'user') {
-          if (item.contentType === 'image') {
-            markdown += `## 👤 User\n\n`;
-            markdown += `**Image Attachment:**\n\n File Name: ${item.imageName}\n\n Image: ![${item.imageName}](${item.imageName})\n\n`;
-          } else if (item.contentType === 'attachment') {
-            markdown += `## 👤 User\n\n`;
-            markdown += `**File Attachment:** ${item.fileName}\n\n`;
-            if (item.fileInfo) {
-              markdown += `File Size: _${item.fileInfo}_\n\n`;
-            }
-            if (item.previewName) {
-              markdown += `File Name: ![${item.fileName}](${item.previewName})\n\n`;
-            }
-          } else {
-            markdown += `## 👤 User\n\n`;
-            markdown += `${item.text}\n\n`;
-          }
-        } else if (item.type === 'model') {
-          if (item.contentType === 'reasoning') {
-            markdown += `## 🤖 Model (Reasoning)\n\n`;
-            markdown += `${item.text}\n\n`;
-          } else {
-            markdown += `## 🤖 Model\n\n`;
-            markdown += `${item.text}\n\n`;
-          }
-        }
-      }
-
-      // Step 5: Create ZIP file
-      console.log('Creating ZIP file...');
-      const zip = new JSZip();
-
-      // Add markdown file
-      zip.file('conversation.md', markdown);
-
-      // Add images
-      for (const image of images) {
-        if (image.base64) {
-          // Remove data URL prefix (e.g., "data:image/png;base64,")
-          const base64Data = image.base64.split(',')[1];
-          zip.file(image.name, base64Data, { base64: true });
-        }
-      }
-
-      // Generate ZIP
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-      if (shouldCancel) throw new Error('Export cancelled by user');
-
-      // Step 6: Download ZIP
-      updateLoadingStatus('Download starting...', 'Finalizing...');
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `ai-studio-export-${timestamp}.zip`;
-
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log('Export completed successfully!');
-
-      // Step 5: Revert raw mode to original state if it was toggled
-      if (!initialRawModeEnabled) {
-        console.log('Reverting raw output mode to original state...');
-        try {
-          const { rawOutputButton: rawOutputButtonRevert } = await ensureMoreActionsMenuOpen();
-          rawOutputButtonRevert.click();
-          await sleep(CONFIG.ELEMENT_LOAD_DELAY);
-
-          // Verify that raw mode was disabled successfully
-          const rawModeAfterRevert = isRawModeEnabled();
-          console.log(`Raw mode after revert: ${rawModeAfterRevert ? 'ON' : 'OFF'}`);
-          if (rawModeAfterRevert) {
-            console.warn('Warning: Failed to disable raw output mode');
-          }
-        } catch (revertError) {
-          console.warn('Warning: Failed to revert raw output mode', revertError);
-        } finally {
-          await closeMoreActionsMenuIfOpen();
-        }
-      }
-
-      return {
-        success: true,
-        message: `Exported ${conversationData.length} messages with ${images.length} images`,
-        filename: filename
-      };
-
+      setBadge(
+        AISE.badge.outcomeFor(result, downgraded),
+        result && result.message,
+        downgraded ? 'downgrade' : null
+      );
+      return result;
     } catch (error) {
-      console.error('Export failed:', error);
-      return {
-        success: false,
-        message: error.message
-      };
+      console.error('[AI Studio Exporter] Export failed:', error);
+      const message = error && error.message ? error.message : String(error);
+      setBadge('failed', message);
+      return { success: false, message };
     } finally {
       isExporting = false;
       shouldCancel = false;
+      progress = null;
       hideLoadingOverlay();
     }
   }
 
-  // Listen for messages from popup
+  const runSingleExport = (request) =>
+    runExport(request, (options) => AISE.exporter.exportConversation(options));
+
+  /**
+   * Whole-library export is a Pro feature in its own right, not just a Pro
+   * format, so it is checked here rather than trusting the popup to have
+   * disabled the button.
+   */
+  async function runLibraryExport(request) {
+    if (!(await AISE.license.isPro({ skipRevalidation: true }))) {
+      // Badged rather than merely returned: the popup closes the moment it
+      // sends this message, so nothing is listening for the reply.
+      const message = 'Library export requires a Pro licence.';
+      setBadge('failed', message);
+      return { success: false, message };
+    }
+    return runExport(request, (options) =>
+      AISE.batch.exportLibrary(Object.assign({ filters: request.filters || {} }, options))
+    );
+  }
+
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    const senderUrl = sender?.url;
-    const isInternalMessage = sender?.id === chrome.runtime.id &&
+    const senderUrl = sender && sender.url;
+    const isInternal =
+      sender && sender.id === chrome.runtime.id &&
       (!senderUrl || senderUrl.startsWith(chrome.runtime.getURL('')));
 
-    if (!isInternalMessage) {
-      sendResponse?.({ success: false, message: 'Invalid sender' });
+    if (!isInternal) {
+      if (sendResponse) sendResponse({ success: false, message: 'Invalid sender' });
       return false;
     }
-
     if (!request || typeof request !== 'object' || Array.isArray(request) || typeof request.action !== 'string') {
-      sendResponse?.({ success: false, message: 'Invalid request' });
+      if (sendResponse) sendResponse({ success: false, message: 'Invalid request' });
       return false;
     }
-
     if (!ALLOWED_ACTIONS.has(request.action)) {
       sendResponse({ success: false, message: 'Unsupported action' });
       return false;
     }
 
     if (request.action === 'export') {
-      exportConversation().then(sendResponse);
-      return true; // Will respond asynchronously
+      runSingleExport(request).then(sendResponse);
+      return true; // responds asynchronously
     }
-
+    if (request.action === 'exportLibrary') {
+      runLibraryExport(request).then(sendResponse);
+      return true;
+    }
     if (request.action === 'getStatus') {
-      sendResponse({ isExporting });
+      // The popup polls this while it is open, so it can show live progress
+      // rather than the word "exporting".
+      sendResponse({ isExporting, progress: progress ? Object.assign({}, progress) : null });
       return false;
     }
 
@@ -776,4 +739,12 @@
     return false;
   });
 
-})();
+  // Injection marker. The isolated world is invisible from the page and from
+  // devtools automation, so without this there is no way to tell "extension not
+  // loaded" apart from "extension loaded but broken"; which is the first thing
+  // worth knowing in any bug report.
+  document.documentElement.dataset.aiStudioExporter =
+    (chrome.runtime.getManifest && chrome.runtime.getManifest().version) || 'unknown';
+
+  console.log('[AI Studio Exporter] content script ready');
+})(typeof globalThis !== 'undefined' ? globalThis : self);

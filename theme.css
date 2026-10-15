@@ -1,0 +1,692 @@
+/**
+ * Graphite / azure: the one design system.
+ *
+ * Every surface the extension owns reads its colour, radius and type from
+ * here. The in-page overlay is the exception by necessity: it is injected into
+ * a document we do not control, so content.js carries a copy of the tokens it
+ * needs. Change a value here and change it there.
+ *
+ * The rule the palette is built around: azure only ever means "this is the
+ * action". It is never decorative. Green, amber and red only ever mean state.
+ * Anything else is graphite.
+ *
+ * @license MIT
+ */
+
+/* Bundled rather than fetched from Google: an extension that phones home for
+   a typeface leaks every popup open, and it would not render offline. Latin
+   subsets only, 55 kB for the three files. */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('fonts/manrope-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/plex-mono-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/plex-mono-600-latin.woff2') format('woff2');
+}
+
+/*
+ * Dark is the default and the base. Light overrides only the colour tokens
+ * below; nothing outside this block knows which one is active.
+ *
+ * The attribute is written by theme-init.js before first paint, and it always
+ * holds a concrete value: "system" is resolved to dark or light in script, so
+ * the stylesheet never has to express the same palette twice.
+ */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* --- surface ------------------------------------------------------- */
+  --page: #101114;
+  --raised: #16181c;
+  --field: #1d1f24;
+  --hover: #1d1f24;
+  --disabled-bg: #23262c;
+
+  --line: #2b2e36;
+  --line-card: #262931;
+  --line-soft: #22242a;
+  --divider: #1e2026;
+
+  /* --- ink ----------------------------------------------------------- */
+  --text: #e7e8ea;
+  --text-2: #cfd2d8;
+  --text-3: #b9bec6;
+  --dim: #8f949c;
+  --dimmer: #6f757d;
+  --disabled-ink: #5c6169;
+
+  /* --- azure: the action --------------------------------------------- */
+  --accent: #4f9dfa;
+  --accent-hover: #6fb0fb;
+  --accent-ink: #04182e;
+  --accent-soft: #9cc9fd;
+  --accent-softer: #cfe4fd;
+  --accent-body: #b8cfe8;
+  --accent-08: rgba(79, 157, 250, 0.08);
+  --accent-10: rgba(79, 157, 250, 0.1);
+  --accent-16: rgba(79, 157, 250, 0.16);
+  --accent-22: rgba(79, 157, 250, 0.22);
+
+  /* --- state: everything else that is coloured ------------------------ */
+  --ok: #5cc98a;
+  --ok-ink: #06170e;
+  --ok-label: #8ddcaa;
+  --ok-body: #a9c9b5;
+  --ok-10: rgba(92, 201, 138, 0.1);
+  --ok-14: rgba(92, 201, 138, 0.14);
+
+  --warn: #d9a34a;
+  --warn-ink: #1a1305;
+  --warn-label: #e0be86;
+  --warn-body: #cbbfa6;
+  --warn-10: rgba(217, 163, 74, 0.1);
+  --warn-16: rgba(217, 163, 74, 0.16);
+
+  --err: #e8736b;
+  --err-ink: #1a0b0a;
+  --err-label: #f0a49e;
+  --err-body: #cbb0ad;
+  --err-10: rgba(232, 115, 107, 0.1);
+  --err-16: rgba(232, 115, 107, 0.16);
+  --err-30: rgba(232, 115, 107, 0.3);
+
+  /* --- metrics -------------------------------------------------------- */
+  --r-sm: 5px;
+  --r-md: 9px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+  --r-2xl: 16px;
+  --r-pill: 999px;
+
+  --sans: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --scrim: rgba(8, 9, 11, 0.72);
+  --lift: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --toast-lift: 0 12px 30px rgba(0, 0, 0, 0.45);
+
+  /* --- component surfaces that are neither page nor state -------------- */
+  --notice-bg: #1a1c21;
+  --track: #26282f;
+  --track-muted: #4b4f57;
+  --knob-off: var(--disabled-ink);
+  --seg-on: #2b2e36;
+  --err-hover: #ef8a83;
+}
+
+/*
+ * Light.
+ *
+ * Derived from the same hues rather than invented. Azure, green, amber and red
+ * are each darkened until they clear 4.5:1 on white; they are the same accents,
+ * not a second set. Panels stay white and the page goes grey, which is the
+ * inverse of dark and keeps a card readable as a card.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --page: #f6f7f9;
+  --raised: #ffffff;
+  --field: #ffffff;
+  --hover: #f1f3f6;
+  --disabled-bg: #eceef2;
+
+  --line: #d1d5dd;
+  --line-card: #e3e5ea;
+  --line-soft: #e3e5ea;
+  --divider: #eaecf0;
+
+  --text: #14161a;
+  --text-2: #2c3038;
+  --text-3: #454a54;
+  --dim: #666c77;
+  --dimmer: #858b96;
+  --disabled-ink: #a3a8b2;
+
+  --accent: #1668d6;
+  --accent-hover: #1257b4;
+  --accent-ink: #ffffff;
+  --accent-soft: #1257b4;
+  --accent-softer: #0e4a99;
+  --accent-body: #3a4250;
+  --accent-08: rgba(22, 104, 214, 0.06);
+  --accent-10: rgba(22, 104, 214, 0.08);
+  --accent-16: rgba(22, 104, 214, 0.12);
+  --accent-22: rgba(22, 104, 214, 0.18);
+
+  --ok: #1f8a4d;
+  --ok-ink: #ffffff;
+  --ok-label: #17673a;
+  --ok-body: #3c4a41;
+  --ok-10: rgba(31, 138, 77, 0.08);
+  --ok-14: rgba(31, 138, 77, 0.12);
+
+  --warn: #a76a12;
+  --warn-ink: #ffffff;
+  --warn-label: #8a5810;
+  --warn-body: #4d4232;
+  --warn-10: rgba(167, 106, 18, 0.08);
+  --warn-16: rgba(167, 106, 18, 0.13);
+
+  --err: #cf3a2f;
+  --err-ink: #ffffff;
+  --err-label: #b02c22;
+  --err-body: #4d3330;
+  --err-10: rgba(207, 58, 47, 0.07);
+  --err-16: rgba(207, 58, 47, 0.12);
+  --err-30: rgba(207, 58, 47, 0.28);
+
+  --scrim: rgba(20, 22, 26, 0.35);
+  --lift: 0 24px 60px rgba(20, 22, 30, 0.18);
+  --toast-lift: 0 12px 30px rgba(20, 22, 30, 0.22);
+
+  --notice-bg: #f1f3f6;
+  --track: #e3e5ea;
+  --track-muted: #b0b5be;
+  /* White on a grey track, rather than grey on grey. */
+  --knob-off: #ffffff;
+  --seg-on: #ffffff;
+  --err-hover: #b02c22;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Any `display` rule beats the UA stylesheet's `[hidden] { display: none }`,
+   so a flex container with the attribute set stays on screen. Every panel
+   here is a flex container. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- primitives shared by the popup and the settings page -------------- */
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: -0.01em;
+}
+
+/* Buttons ------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.btn svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-quiet {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text);
+}
+.btn-quiet:hover:not(:disabled) { border-color: var(--accent); }
+
+.btn-danger {
+  background: var(--err);
+  color: var(--err-ink);
+  font-weight: 700;
+}
+.btn-danger:hover:not(:disabled) { background: var(--err-hover); }
+
+/* A destructive action that is not the point of the screen: quiet until
+   hovered, then unmistakably destructive. */
+.btn-destructive {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--dim);
+}
+.btn-destructive:hover:not(:disabled) {
+  border-color: var(--err);
+  color: var(--err);
+}
+
+.btn:disabled {
+  background: var(--disabled-bg);
+  border-color: transparent;
+  color: var(--disabled-ink);
+  cursor: not-allowed;
+}
+.btn-quiet:disabled,
+.btn-destructive:disabled {
+  background: transparent;
+  border-color: var(--line);
+}
+
+/* Chips ---------------------------------------------------------------- */
+
+.chip {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 5px;
+  border-radius: var(--r-sm);
+  background: var(--accent-16);
+  color: var(--accent-soft);
+}
+.chip-ok { background: var(--ok-14); color: var(--ok-label); }
+
+/* Notices: one pattern, four tones, used by both pages ------------------ */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 12px;
+  border-radius: var(--r-lg);
+  background: var(--notice-bg);
+}
+.notice[hidden] { display: none; }
+.notice .notice-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.notice .notice-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.notice .notice-action {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--dim);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--sans);
+}
+.notice .notice-action:hover { color: var(--text); }
+.notice .notice-action svg { width: 13px; height: 13px; }
+
+.notice.is-ok { background: var(--ok-10); }
+.notice.is-ok .notice-label { color: var(--ok); }
+.notice.is-ok .notice-body { color: var(--ok-body); }
+
+.notice.is-warn { background: var(--warn-10); }
+.notice.is-warn .notice-label { color: var(--warn); }
+.notice.is-warn .notice-body { color: var(--warn-body); }
+
+.notice.is-err { background: var(--err-10); }
+.notice.is-err .notice-label { color: var(--err); }
+.notice.is-err .notice-body { color: var(--err-body); }
+
+.notice.is-info { background: var(--accent-10); }
+.notice.is-info .notice-label { color: var(--accent-soft); }
+.notice.is-info .notice-body { color: var(--accent-body); }
+
+/* A blocked-state strip carries an icon; a history notice does not. */
+.notice.has-icon {
+  flex-direction: row;
+  gap: 10px;
+  padding: 12px;
+}
+.notice.has-icon > svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; }
+.notice.has-icon .notice-text { display: flex; flex-direction: column; gap: 2px; }
+.notice.is-err.has-icon > svg { color: var(--err); }
+.notice.is-warn.has-icon > svg { color: var(--warn); }
+.notice.is-info.has-icon > svg { color: var(--accent); }
+
+/* Progress: 4px, and always present so nothing resizes ------------------ */
+
+.bar {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--track);
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+/* No total to divide by yet: sweep instead of sitting at zero. */
+.bar.is-indeterminate > span {
+  width: 30%;
+  background: var(--accent-22);
+  animation: bar-sweep 1.4s ease-in-out infinite;
+}
+.bar.is-warn > span { background: var(--warn); }
+.bar.is-muted > span { background: var(--track-muted); }
+
+@keyframes bar-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(333%); }
+}
+
+/* Toggles ---------------------------------------------------------------
+   Driven by a real checkbox rather than a div with a role: the input keeps
+   the keyboard behaviour, the focus ring and the form semantics, and the
+   label next to it is only paint. */
+
+.switch-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: 38px;
+  height: 22px;
+  cursor: pointer;
+}
+/* Transparent and full-size rather than clipped to a pixel: the input stays
+   the real hit target, so pointer, keyboard and automation all reach the same
+   element, and only the paint beneath it is ours. */
+.switch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switch {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  transition: background-color 0.16s ease;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--knob-off);
+  transition: transform 0.16s ease, background-color 0.16s ease;
+}
+.switch-input:checked + .switch { background: var(--accent); }
+.switch-input:checked + .switch::after {
+  transform: translateX(16px);
+  background: var(--accent-ink);
+}
+.switch-input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-input:disabled { cursor: not-allowed; }
+
+/* Segmented control -----------------------------------------------------
+   For three-or-fewer mutually exclusive choices whose labels are short. A
+   select would hide two of the three behind a click; here all of them are
+   readable at once, which is the point. Radios underneath, so arrow keys and
+   the form semantics come free. */
+
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  flex: 0 0 auto;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.seg label { position: relative; display: block; }
+.seg input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.seg span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  white-space: nowrap;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+.seg svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.seg label:hover span { color: var(--text); }
+.seg input:checked + span { background: var(--seg-on); color: var(--text); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Icon buttons: a link or a button whose whole label is its glyph --------- */
+
+.icon-btn {
+  display: inline-flex;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+  border-radius: var(--r-md);
+  transition: color 0.14s ease, background-color 0.14s ease;
+}
+.icon-btn:hover { color: var(--text); background: var(--accent-10); }
+.icon-btn:active { background: var(--accent-16); }
+.icon-btn svg { width: 17px; height: 17px; display: block; }
+
+/* Dropdown -------------------------------------------------------------
+   Built by src/listbox.js. The list floats over the page rather than sitting
+   in the flow: a browser action popup is sized to its document, so a list in
+   the flow makes the whole popup jump taller the moment it opens. */
+
+.picker { position: relative; display: block; }
+
+.picker-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.14s ease;
+}
+.picker-btn:hover:not(:disabled) { border-color: var(--dimmer); }
+.picker-btn[aria-expanded='true'] { border-color: var(--accent); }
+.picker-btn:disabled { color: var(--disabled-ink); cursor: not-allowed; }
+.picker-btn:focus-visible { outline: none; border-color: var(--accent); }
+.picker-btn > svg { width: 12px; height: 12px; flex: 0 0 auto; color: var(--dim); }
+.picker-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.picker-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 0;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--lift);
+  overflow-y: auto;
+  /* The default scrollbar is light and lands in the middle of a dark panel,
+     which is the only bright thing on the whole surface. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+/* Flipped when there is more room above the button than below it. */
+.picker-list.is-above { top: auto; bottom: calc(100% + 6px); }
+
+.picker-opt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.picker-opt:hover:not([aria-disabled='true']) { background: var(--hover); }
+.picker-opt[aria-selected='true'] { background: var(--accent-16); color: var(--accent-softer); }
+.picker-opt[aria-disabled='true'] { color: var(--disabled-ink); cursor: not-allowed; }
+.picker-opt:focus-visible { outline: none; background: var(--hover); box-shadow: inset 2px 0 0 var(--accent); }
+
+/* Text inputs ----------------------------------------------------------- */
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.input::placeholder { color: var(--disabled-ink); }
+.input:focus-visible { outline: none; border-color: var(--accent); }
+.input.is-invalid { border-color: var(--err); }
+
+/* Modal: the same card and scrim as the injected overlay ---------------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  backdrop-filter: blur(8px);
+}
+.scrim[hidden] { display: none; }
+.modal {
+  width: 340px;
+  padding: 24px;
+  background: var(--raised);
+  border: 1px solid var(--line-card);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--lift);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.modal p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--dim); }
+.modal .modal-actions { display: flex; gap: 8px; margin-top: 6px; }
+.modal .modal-actions .btn { flex: 1; }
+
+/* Toast ----------------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(12px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: var(--r-pill);
+  background: var(--ok);
+  color: var(--ok-ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--toast-lift);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 60;
+}
+.toast svg { width: 14px; height: 14px; }
+.toast.is-shown { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

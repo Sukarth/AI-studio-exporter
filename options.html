@@ -2,307 +2,487 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio Exporter Settings</title>
-    <style>
-        :root {
-            --bg-color: #1a1b1e;
-            --card-bg: #25262b;
-            --text-primary: #e9ecef;
-            --text-secondary: #a5a5a5;
-            --accent-color: #667eea;
-            --accent-hover: #5a6fd6;
-            --border-color: #2c2e33;
-            --input-bg: #2c2e33;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Studio Exporter settings</title>
+  <script src="theme-init.js"></script>
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    body { padding: 48px 24px 96px; }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    main {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            line-height: 1.6;
-            padding: 40px 20px;
-        }
+    .page-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+    .page-head h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .page-head .build { font-family: var(--mono); font-size: 11px; color: var(--dimmer); }
+    .page-head .build .tier { color: var(--accent-soft); }
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
+    .lede { margin: -8px 0 6px; font-size: 12.5px; color: var(--dim); }
+    .lede a { color: var(--accent-soft); text-decoration: none; }
 
-        .header {
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 20px;
-        }
+    /* Every section is a card.
+       The page previously mixed bare groups with bordered panels, so the
+       licence and the backup schedule looked like the only two things with
+       edges and the twelve switches between them ran together into one
+       undifferentiated column. One container type, used everywhere, is what
+       makes a long settings page scannable. */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px 18px 18px;
+      border-radius: var(--r-xl);
+      background: var(--raised);
+      border: 1px solid var(--line-soft);
+    }
+    .panel.is-locked { opacity: 0.55; }
 
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
+    /* The card's title bar: name, badge, and what the section is for. The
+       description belongs inside the header rather than under the rule,
+       because it introduces the settings and a rule between the two says the
+       opposite. */
+    .panel-head {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: -2px 0 -2px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--divider);
+    }
+    .panel-head .titles { display: flex; align-items: center; gap: 9px; }
+    .panel-head .eyebrow { margin-right: auto; }
 
-        .subtitle {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
+    .hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--dim); }
+    .hint a { color: var(--accent-soft); text-decoration: none; }
+    .hint a:hover { text-decoration: underline; }
 
-        .card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 20px;
-            border: 1px solid var(--border-color);
-        }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    .row .what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .row .what strong { font-size: 13.5px; font-weight: 600; }
+    .row .what span { font-size: 12px; color: var(--dim); }
+    .row .picker, .row .input { width: 220px; flex: 0 0 auto; }
 
-        .section-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: var(--accent-color);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    .rule { height: 1px; background: var(--divider); }
 
-        .setting-group {
-            margin-bottom: 20px;
-        }
+    .sub { display: flex; flex-direction: column; gap: 12px; padding-left: 16px; border-left: 1px solid var(--divider); }
+    .sub.is-off { opacity: 0.45; }
 
-        .setting-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-        }
+    .split { display: flex; gap: 12px; }
+    .split > label { flex: 1; display: flex; flex-direction: column; gap: 5px; }
 
-        .setting-label {
-            font-size: 14px;
-        }
+    .licence-active { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .licence-key { font-family: var(--mono); font-size: 12.5px; color: var(--text-3); }
 
-        .sub-setting {
-            margin-left: 28px;
-            margin-bottom: 8px;
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        /* Toggle Switch */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 44px;
-            height: 24px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #373a40;
-            transition: .4s;
-            border-radius: 24px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked+.slider {
-            background-color: var(--accent-color);
-        }
-
-        input:focus+.slider {
-            box-shadow: 0 0 1px var(--accent-color);
-        }
-
-        input:checked+.slider:before {
-            transform: translateX(20px);
-        }
-
-        /* Number Input */
-        .number-input {
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 8px 12px;
-            border-radius: 6px;
-            width: 100px;
-            font-size: 14px;
-        }
-
-        .number-input:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
-
-        .actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-            margin-top: 30px;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: none;
-        }
-
-        .btn-primary {
-            background-color: var(--accent-color);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-        }
-
-        .btn-secondary {
-            background-color: transparent;
-            color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--input-bg);
-            color: var(--text-primary);
-        }
-
-        .status-msg {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 12px 24px;
-            border-radius: 8px;
-            background-color: #2b8a3e;
-            color: white;
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-
-        .status-msg.show {
-            opacity: 1;
-        }
-    </style>
+    .page-foot {
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      padding-top: 16px; margin-top: 4px; border-top: 1px solid var(--divider);
+    }
+    .page-foot .links { display: flex; align-items: center; gap: 16px; font-size: 12.5px; }
+    .page-foot a { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); text-decoration: none; }
+    .page-foot a:hover { color: var(--text); }
+    .page-foot svg { width: 15px; height: 15px; }
+  </style>
 </head>
 
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Settings</h1>
-            <p class="subtitle">Configure how AI Studio Exporter behaves</p>
-        </div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m6 9.5 6 6 6-6"></path>
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5"></path>
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m5 12.5 4.5 4.5L19 7"></path>
+      </symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8.5 21h7"></path><path d="M12 17v4"></path>
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.5 14.3A8.5 8.5 0 1 1 9.7 3.5a6.8 6.8 0 0 0 10.8 10.8z"></path>
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4.2"></circle>
+        <path d="M12 1.8v2.4M12 19.8v2.4M4.8 4.8l1.7 1.7M17.5 17.5l1.7 1.7M1.8 12h2.4M19.8 12h2.4M4.8 19.2l1.7-1.7M17.5 6.5l1.7-1.7"></path>
+      </symbol>
+      <!-- The GitHub mark is a solid glyph, not an outline: it is a logo and
+           redrawing it as a stroke would make it something else. -->
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.93 3.19 9.11 7.61 10.58.56.1.76-.24.76-.53 0-.26-.01-1.14-.02-2.07-3.09.67-3.74-1.49-3.74-1.49-.5-1.27-1.22-1.61-1.22-1.61-.99-.68.08-.67.08-.67 1.1.08 1.68 1.13 1.68 1.13.98 1.67 2.57 1.19 3.2.91.1-.71.38-1.19.69-1.46-2.47-.28-5.06-1.24-5.06-5.52 0-1.22.44-2.22 1.16-3.01-.12-.28-.5-1.42.11-2.96 0 0 .95-.3 3.11 1.15a10.78 10.78 0 0 1 2.83-.38c.96 0 1.93.13 2.83.38 2.16-1.46 3.11-1.15 3.11-1.15.61 1.54.23 2.68.11 2.96.72.79 1.16 1.79 1.16 3.01 0 4.29-2.6 5.24-5.08 5.51.39.34.74 1.02.74 2.06 0 1.49-.01 2.69-.01 3.06 0 .29.2.64.77.53C19.06 20.86 22.25 16.68 22.25 11.75 22.25 5.48 17.27.5 12 .5z"></path>
+      </symbol>
+    </defs>
+  </svg>
 
-        <div class="card">
-            <div class="section-title">Content Extraction</div>
-
-            <div class="setting-group">
-                <div class="setting-item">
-                    <span class="setting-label">Scrape Images</span>
-                    <label class="switch">
-                        <input type="checkbox" id="scrapeImages">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="setting-group">
-                <div class="setting-item">
-                    <span class="setting-label">Scrape Attachments</span>
-                    <label class="switch">
-                        <input type="checkbox" id="scrapeAttachments">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div id="attachmentOptions">
-                    <div class="setting-item sub-setting">
-                        <span class="setting-label">Include Preview Images</span>
-                        <label class="switch">
-                            <input type="checkbox" id="scrapeAttachmentPreview">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-item sub-setting">
-                        <span class="setting-label">Include File Name</span>
-                        <label class="switch">
-                            <input type="checkbox" id="scrapeAttachmentTitle">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div class="setting-item sub-setting">
-                        <span class="setting-label">Include File Size/Info</span>
-                        <label class="switch">
-                            <input type="checkbox" id="scrapeAttachmentSize">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="setting-group">
-                <div class="setting-item">
-                    <span class="setting-label">Scrape Reasoning Content</span>
-                    <label class="switch">
-                        <input type="checkbox" id="scrapeReasoning">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="section-title">Performance</div>
-
-            <div class="setting-item">
-                <div>
-                    <span class="setting-label">Element Load Delay (ms)</span>
-                    <div class="subtitle" style="font-size: 12px; margin-top: 4px;">Increase this if exports are missing
-                        content</div>
-                </div>
-                <input type="number" id="loadDelay" class="number-input" min="200" step="100">
-            </div>
-        </div>
-
-        <div class="actions">
-            <button id="resetBtn" class="btn btn-secondary">Reset to Defaults</button>
-            <button id="saveBtn" class="btn btn-primary">Save Settings</button>
-        </div>
+  <main>
+    <div class="page-head">
+      <h1>Settings</h1>
+      <span class="build">AI Studio Exporter v<span id="version"></span><span id="tierLabel" hidden> &middot; <span class="tier">Pro</span></span></span>
     </div>
+    <p class="lede">
+      Stored in your browser and synced with your Chrome profile. Nothing about your
+      conversations is ever sent anywhere.
+    </p>
 
-    <div id="statusMsg" class="status-msg">Settings saved successfully</div>
+    <!-- --- licence ----------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="eyebrow">Licence</span>
+          <span id="proBadge" class="chip">LOCKED</span>
+        </div>
+        <p class="hint" id="licenseBlurb">
+          Pro unlocks PDF, Word, Obsidian, CSV and JSONL, whole-library export and
+          scheduled backups. One payment, no subscription.
+        </p>
+      </div>
 
-    <script src="settings.js"></script>
-    <script src="options.js"></script>
+      <div id="licenseEntry" class="split">
+        <label style="flex:1">
+          <input type="text" id="licenseKey" class="input"
+                 placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                 autocomplete="off" spellcheck="false" aria-label="Licence key">
+        </label>
+        <button id="activateBtn" class="btn btn-primary" style="flex:0 0 auto">Activate</button>
+      </div>
+
+      <div id="licenseActive" class="licence-active" hidden>
+        <span id="licenseMasked" class="licence-key"></span>
+        <button id="deactivateBtn" class="btn btn-destructive">Remove</button>
+      </div>
+
+      <div class="split">
+        <button id="buyBtn" class="btn btn-quiet">Get a licence</button>
+      </div>
+
+      <div id="licenseNotice" class="notice" hidden>
+        <span class="notice-label"></span>
+        <span class="notice-body"></span>
+      </div>
+    </section>
+
+    <!-- --- general ----------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="eyebrow">General</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Theme</strong>
+          <span>Applies to this page, the popup and the overlay on AI&nbsp;Studio.</span>
+        </div>
+        <!-- Radios rather than a dropdown: three short, mutually exclusive
+             options, all worth seeing at once. -->
+        <div class="seg" role="radiogroup" aria-label="Theme">
+          <label>
+            <input type="radio" name="theme" id="themeSystem" value="system">
+            <span><svg><use href="#i-monitor"></use></svg>System</span>
+          </label>
+          <label>
+            <input type="radio" name="theme" id="themeDark" value="dark">
+            <span><svg><use href="#i-moon"></use></svg>Dark</span>
+          </label>
+          <label>
+            <input type="radio" name="theme" id="themeLight" value="light">
+            <span><svg><use href="#i-sun"></use></svg>Light</span>
+          </label>
+        </div>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Export format</strong>
+          <span>Also set by the popup's picker, and used by scheduled backups.</span>
+        </div>
+        <!-- Built by src/listbox.js, the same control the popup uses. -->
+        <div id="defaultFormat"></div>
+      </div>
+    </section>
+
+    <!-- --- what to include --------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="eyebrow">What to include</span>
+        </div>
+        <p class="hint">
+          The API exposes far more than the page shows. Turn off anything you would rather
+          keep out of your exports.
+        </p>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Model reasoning</strong>
+          <span>Thinking shown before the answer, kept as its own message.</span>
+        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="scrapeReasoning" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Model settings</strong>
+          <span>Model name, temperature, top-P, top-K and output limit.</span>
+        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeModelConfig" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>System instruction</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeSystemInstruction" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Timestamps</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeTimestamps" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Token counts</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeTokenCounts" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Link back to the conversation</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="includeSourceUrl" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- --- attachments -------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="eyebrow">Attachments</span>
+        </div>
+        <p class="hint">
+          Files are fetched from Drive, so exports contain the real thing rather than a
+          thumbnail.
+        </p>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Keep attachments with their message</strong>
+          <span>AI Studio stores each attached file as its own message. On by default, so a
+            message with three images stays one message instead of four.</span>
+        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="condenseAttachments" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Images</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="scrapeImages" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+      <div class="rule"></div>
+
+      <div class="row">
+        <div class="what"><strong>Files and documents</strong></div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="scrapeAttachments" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+
+      <div id="attachmentOptions" class="sub">
+        <div class="row">
+          <div class="what"><strong>File names</strong></div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="scrapeAttachmentTitle" class="switch-input">
+            <span class="switch"></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="what"><strong>File sizes</strong></div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="scrapeAttachmentSize" class="switch-input">
+            <span class="switch"></span>
+          </label>
+        </div>
+        <div class="row">
+          <div class="what">
+            <strong>Thumbnails</strong>
+            <span>Only used when the page is scraped as a fallback.</span>
+          </div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="scrapeAttachmentPreview" class="switch-input">
+            <span class="switch"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- --- fine-tuning -------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="eyebrow">Fine-tuning dataset</span>
+          <span class="chip">PRO</span>
+        </div>
+        <p class="hint">
+          Applies to the JSONL export only.
+          <a href="https://exportaistudio.vercel.app/docs/formats#jsonl"
+             target="_blank" rel="noopener">What goes in a JSONL export?</a>
+        </p>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Include reasoning in the dataset</strong>
+          <span>Off by default: training on a model's private thinking as if it were the
+            reply teaches it to emit thinking as output.</span>
+        </div>
+        <label class="switch-wrap">
+          <input type="checkbox" id="jsonlIncludeReasoning" class="switch-input">
+          <span class="switch"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- --- scheduled backup --------------------------------------------- -->
+    <section class="panel" id="backupPanel">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="eyebrow">Scheduled backup</span>
+          <span id="backupProBadge" class="chip">PRO</span>
+        </div>
+        <p class="hint">
+          Runs in a background tab, with no overlay; watch the toolbar badge. Only what
+          changed since last time is fetched, and Chrome must be running when one is due.
+        </p>
+      </div>
+
+      <div id="backupControls">
+        <div class="row">
+          <div class="what">
+            <strong>Back up my library automatically</strong>
+          </div>
+          <label class="switch-wrap">
+            <input type="checkbox" id="backupEnabled" class="switch-input">
+            <span class="switch"></span>
+          </label>
+        </div>
+
+        <div class="split" style="margin-top:14px">
+          <label>
+            <span class="field-label">Frequency</span>
+            <div id="backupFrequency"></div>
+          </label>
+          <label>
+            <span class="field-label">Format</span>
+            <div id="backupFormat"></div>
+          </label>
+          <label style="flex:0 0 auto; justify-content:flex-end">
+            <button id="runBackupBtn" class="btn btn-quiet">Run now</button>
+          </label>
+        </div>
+      </div>
+
+      <div id="backupNotice" class="notice" hidden>
+        <span class="notice-label"></span>
+        <span class="notice-body"></span>
+      </div>
+    </section>
+
+    <!-- --- advanced ----------------------------------------------------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="eyebrow">Advanced</span>
+        </div>
+        <p class="hint">
+          Only used when the API is unavailable and the page has to be scraped instead.
+        </p>
+      </div>
+
+      <div class="row">
+        <div class="what">
+          <strong>Page load delay</strong>
+          <span>Milliseconds to wait for each message to render before reading it.</span>
+        </div>
+        <input type="number" id="loadDelay" class="input" min="200" max="5000" step="50"
+               aria-label="Page load delay in milliseconds">
+      </div>
+    </section>
+
+    <div class="page-foot">
+      <span class="links">
+        <button id="saveBtn" class="btn btn-primary">Save settings</button>
+        <button id="resetBtn" class="btn btn-destructive">Reset to defaults</button>
+      </span>
+      <span class="links">
+        <a href="https://exportaistudio.vercel.app/docs"
+           target="_blank" rel="noopener noreferrer">
+          <svg><use href="#i-book"></use></svg>Format docs
+        </a>
+        <a href="https://github.com/Sukarth/AI-studio-exporter" target="_blank" rel="noopener noreferrer">
+          <svg><use href="#i-github"></use></svg>GitHub
+        </a>
+      </span>
+    </div>
+  </main>
+
+  <div id="resetScrim" class="scrim" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+      <h2 id="resetTitle">Reset all settings?</h2>
+      <p>Format, attachments, the fine-tuning options and the backup schedule go back to
+        defaults. Your licence key is kept.</p>
+      <div class="modal-actions">
+        <button id="resetCancel" class="btn btn-quiet">Cancel</button>
+        <button id="resetConfirm" class="btn btn-danger">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">
+    <svg><use href="#i-check"></use></svg><span id="toastText"></span>
+  </div>
+
+  <script src="settings.js"></script>
+  <script src="src/badge.js"></script>
+  <script src="src/listbox.js"></script>
+  <script src="pro/license.js"></script>
+  <script src="options.js"></script>
 </body>
 
 </html>
