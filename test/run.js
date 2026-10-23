@@ -1005,7 +1005,9 @@ function readTokens(source, selector) {
 }
 
 function assertPalettesAgree(themeSelector, overlaySelector, label) {
-  const theme = readTokens(fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8'), themeSelector);
+  // Normalised: a Windows checkout with core.autocrlf has CRLF line endings,
+  // and the selector being looked up spans two lines.
+  const theme = readTokens(fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8').replace(/\r\n/g, '\n'), themeSelector);
   const content = fs.readFileSync(path.join(ROOT, 'content.js'), 'utf8');
   const overlayCss = /const OVERLAY_CSS = `([\s\S]*?)`;/.exec(content);
   assert.ok(overlayCss, 'OVERLAY_CSS not found in content.js');
