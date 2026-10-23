@@ -242,10 +242,11 @@
 
     AISE.model.applySettings(conversation, settings);
 
-    // Formats can flag content they cannot represent; the PDF fonts, for
-    // instance, cannot draw non-Latin scripts. Surface it rather than handing
-    // back a file full of question marks with no explanation.
-    const warning = typeof format.warn === 'function' ? format.warn(conversation) : null;
+    // Formats can flag content they cannot represent; the PDF font, for
+    // instance, cannot draw Chinese or Arabic. Surface it rather than handing
+    // back a file full of question marks with no explanation. Awaited because
+    // the PDF answers by loading its font and asking it.
+    const warning = typeof format.warn === 'function' ? await format.warn(conversation) : null;
     if (warning) report(warning);
 
     report('Packaging…');

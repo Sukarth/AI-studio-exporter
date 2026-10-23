@@ -44,7 +44,7 @@ When the export ends, one of the last three replaces it:
 | Read from the page rather than the API (`source: "dom"`) | `!` |
 | One or more attachments could not be downloaded | `!` |
 | A library export where some conversations failed | `!` |
-| The format could not represent something (such as non-Latin text in a PDF) | `!` |
+| The format could not represent something (such as Chinese text in a PDF) | `!` |
 | The export failed, or you cancelled it | `X` |
 | A Pro format was requested without a licence and exported as Markdown | `X` |
 | Library export requested without a licence | `X` |

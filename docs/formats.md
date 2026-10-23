@@ -119,7 +119,8 @@ loaded from the network. Attachments are referenced from the sibling
   stretching the page.
 
 **Good for:** sending to someone who should just be able to open it, or
-printing to PDF from a browser when the conversation is not Latin-script.
+printing to PDF from a browser when the conversation is in a script the PDF
+export cannot draw (see [which scripts the PDF covers](#which-scripts-the-pdf-covers)).
 
 ## PDF
 
@@ -135,14 +136,28 @@ A paginated document, A4, with page numbers.
   Attachment links are relative to the document, which sits beside
   `attachments/` inside the ZIP. Extract the archive before following them.
 
-### The font limitation
+### Which scripts the PDF covers
 
-PDF is generated with the standard PDF font set, which covers Latin only.
-Smart quotes, dashes and ellipses are substituted cleanly; anything outside
-Latin-1 (such as CJK, Devanagari, Kannada, Cyrillic, and emoji) becomes `?`.
+| Text | In the PDF |
+| --- | --- |
+| English and other Latin-script languages, including Polish, Czech, Turkish and Vietnamese | Drawn |
+| Russian, Ukrainian and other Cyrillic; Greek | Drawn |
+| Chinese, Japanese, Korean | `?` |
+| Arabic, Hebrew, Hindi and other Indic scripts, Thai | `?` |
+| Emoji | `?` |
 
-The exporter detects this and warns before you download. **If your conversation
-is not Latin-script, export HTML and print to PDF from your browser instead.**
+A conversation in plain Latin uses the standard PDF fonts and stays small.
+Anything beyond that is drawn with an embedded copy of Noto Sans (and Noto
+Sans Mono for code), which makes the file about 0.5 MB larger.
+
+The rest are left out on purpose. A Chinese, Japanese or Korean font is several
+megabytes, and Arabic, Hebrew and the Indic scripts need letter shaping and
+right-to-left layout that the PDF library does not do, so they would come out
+wrong rather than missing.
+
+The exporter checks before you download and names the characters it cannot
+draw. **For those conversations, export Word, or export HTML and print to PDF
+from your browser.** Both use your system's fonts.
 
 ## Word
 

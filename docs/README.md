@@ -59,7 +59,7 @@ they were sent with. See [settings guide](settings.md#condense-attachments).
 
 | Symptom | Cause |
 | --- | --- |
-| Non-Latin text is `?` in the PDF | The standard PDF fonts are Latin-only. Export HTML and print to PDF from your browser. |
+| Chinese, Arabic, Hindi or emoji are `?` in the PDF | The PDF font covers Latin, Greek and Cyrillic only ([details](formats.md#which-scripts-the-pdf-covers)). Export Word, or HTML and print to PDF from your browser. |
 | A message shows a file name but no file | The bytes could not be fetched. The name is kept so the record stays honest. |
 | A message has no text, only attachments | AI Studio stored it that way and `condenseAttachments` had nothing to fold it into (usually the last message in a conversation). |
 | Fields are missing everywhere | Either a setting is off ([settings guide](settings.md)) or the export came from the DOM fallback, which cannot see metadata. Check `source` in the JSON. |

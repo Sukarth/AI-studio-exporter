@@ -137,6 +137,6 @@ Some things are limits of the format, not of a toggle:
 
 | | |
 | --- | --- |
-| Non-Latin text becomes `?` in the PDF | The standard PDF fonts are Latin-only. Export HTML and print to PDF from your browser. |
+| Chinese, Arabic, Hindi or emoji become `?` in the PDF | The PDF font covers Latin, Greek and Cyrillic only ([details](formats.md#which-scripts-the-pdf-covers)). Export Word, or HTML and print to PDF from your browser. |
 | An attachment shows a name but no file | The bytes could not be fetched from Drive. `path` is `null` in the JSON. |
 | Everything metadata-ish is missing at once | The export used the DOM fallback. Check `source` in the JSON; see [data reference](data-reference.md#source). |

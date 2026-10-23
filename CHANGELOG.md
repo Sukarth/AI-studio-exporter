@@ -5,6 +5,21 @@ All notable changes to the AI Studio Exporter extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - unreleased
+
+### Fixed
+
+- **PDF export now draws Russian, Ukrainian, Greek and the rest of Latin.**
+  The standard PDF fonts only know Latin-1, so a Cyrillic or Greek
+  conversation came out as question marks. Those PDFs now embed Noto Sans
+  (and Noto Sans Mono for code), loaded from the extension only when a
+  conversation needs it; English PDFs are unchanged and stay small.
+  Chinese, Japanese, Korean, Arabic, Hebrew, Indic scripts and emoji still
+  cannot be drawn, and the warning before download now names the characters
+  and suggests Word as well as HTML.
+- A test of the overlay's colours failed on Windows checkouts, where Git turns
+  line endings into CRLF.
+
 ## [2.0.0] - 2026-10-15
 
 A rewrite. Version 1 scrolled the page and read what it found; version 2 talks

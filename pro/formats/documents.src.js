@@ -18,7 +18,8 @@ import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   ShadingType, ExternalHyperlink, BorderStyle,
 } from 'docx';
-import { PDFDocument, StandardFonts, PDFName, PDFString, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, PDFName, PDFString, rgb, degrees } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 
 const AISE = (globalThis.AISE = globalThis.AISE || {});
 
@@ -534,6 +535,142 @@ function toWinAnsi(text) {
   return out.replace(/[^\u0020-\u007E\u00A0-\u00FF\n]/g, '?');
 }
 
+/**
+ * Everything a conversation's PDF will draw, joined, so one scan answers
+ * "does this need more than Latin-1?" for the title, metadata, file names,
+ * system instruction and messages alike.
+ */
+function pdfText(conversation) {
+  return [
+    conversation.title,
+    conversation.systemInstruction,
+    ...conversation.turns.flatMap((turn) => [turn.text, ...(turn.parts || []).map((part) => part.name)]),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+const substitute = (text) => SUBSTITUTIONS.reduce((t, [pattern, replacement]) => t.replace(pattern, replacement), text);
+
+/** True when some character survives substitution but not Latin-1. */
+const needsUnicode = (text) => /[^\u0000-ÿ]/.test(substitute(text));
+
+// --- Unicode fonts ---------------------------------------------------------
+//
+// The standard PDF fonts only cover Latin-1. For anything beyond it the PDF
+// embeds Noto Sans, which adds Greek, Cyrillic, Vietnamese and the rest of
+// Latin (fonts.js says what was left out and why). They are extension files,
+// fetched only when a conversation needs them, so English PDFs stay as small
+// as before and the content script loaded on every AI Studio page does not
+// carry a megabyte of fonts.
+//
+// Embedded whole, not subset: pdf-lib's own subsetter drops most glyphs from
+// these fonts. A PDF that needs them is about 0.2 to 0.5 MB larger.
+
+const UNICODE_FONT_FILES = {
+  regular: 'fonts/NotoSans-Regular.ttf',
+  bold: 'fonts/NotoSans-Bold.ttf',
+  mono: 'fonts/NotoSansMono-Regular.ttf',
+};
+
+let unicodeFonts = null;
+
+/** Read a file shipped with the extension. Tests replace this. */
+async function readExtensionFile(file) {
+  const response = await fetch(globalThis.chrome.runtime.getURL(file));
+  if (!response.ok) throw new Error(`Could not load ${file} (${response.status})`);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+/**
+ * The font files and the characters each one can draw, loaded once per page.
+ * A failed load is not cached, so the next export tries again.
+ */
+function loadUnicodeFonts() {
+  if (!unicodeFonts) {
+    const read = AISE.readExtensionFile || readExtensionFile;
+    unicodeFonts = Promise.all(
+      Object.entries(UNICODE_FONT_FILES).map(async ([key, file]) => [key, await read(file)])
+    )
+      .then((entries) => {
+        const bytes = Object.fromEntries(entries);
+        return {
+          bytes,
+          text: new Set(fontkit.create(bytes.regular).characterSet),
+          mono: new Set(fontkit.create(bytes.mono).characterSet),
+        };
+      })
+      .catch((error) => {
+        unicodeFonts = null;
+        throw error;
+      });
+  }
+  return unicodeFonts;
+}
+
+/**
+ * Coerce text into what an embedded font can draw: the same typographic
+ * substitutions as toWinAnsi where they are needed, then '?' for any character
+ * the font has no glyph for, so one stray symbol cannot abort the export.
+ */
+const drawable = (char, coverage) => char === '\n' || coverage.has(char.codePointAt(0));
+
+/** A stand-in for a character the font lacks, or null if there is none. */
+function replacement(char, coverage) {
+  const swap = substitute(char);
+  return swap !== char && [...swap].every((c) => drawable(c, coverage)) ? swap : null;
+}
+
+function toCovered(text, coverage) {
+  let out = '';
+  for (const char of String(text == null ? '' : text).replace(/\t/g, '    ')) {
+    out += drawable(char, coverage) ? char : replacement(char, coverage) || '?';
+  }
+  return out;
+}
+
+/** Characters a conversation uses that the embedded font cannot draw. */
+function uncovered(text, coverage) {
+  const missing = new Set();
+  for (const char of text.replace(/\t/g, ' ')) {
+    if (!drawable(char, coverage) && !replacement(char, coverage)) missing.add(char);
+  }
+  return missing;
+}
+
+const LEGACY_WARNING =
+  'This conversation contains characters the standard PDF fonts cannot draw, ' +
+  'and they will appear as "?". Export as HTML and print to PDF from your ' +
+  'browser to keep them readable.';
+
+/**
+ * Before an export: say which characters the PDF cannot draw, if any. Greek,
+ * Cyrillic and the rest of Latin are drawn with the embedded font, so only
+ * what that font lacks (Chinese, Japanese, Korean, Arabic, Hebrew, Indic
+ * scripts, emoji) is reported.
+ */
+async function warnPdf(conversation) {
+  const text = pdfText(conversation);
+  if (!needsUnicode(text)) return null;
+
+  let fonts;
+  try {
+    fonts = await loadUnicodeFonts();
+  } catch (_) {
+    // The PDF will fall back to the standard fonts, so the old warning holds.
+    return hasUnsupportedGlyphs(conversation) ? LEGACY_WARNING : null;
+  }
+  const missing = [...uncovered(text, fonts.text)];
+  if (!missing.length) return null;
+
+  const examples = missing.slice(0, 6).join(' ');
+  return (
+    `This conversation contains characters the PDF font cannot draw (${examples}), ` +
+    'and they will appear as "?". Export as Word, or as HTML and print to PDF ' +
+    'from your browser, to keep them.'
+  );
+}
+
 function hasUnsupportedGlyphs(conversation) {
   // Ask the real converter: anything it had to replace with '?' is a glyph the
   // standard fonts cannot draw. Checking the raw text instead would flag smart
@@ -692,14 +829,41 @@ async function renderPdf(conversation, settings, assetPaths) {
   pdf.setTitle(conversation.title || 'AI Studio conversation');
   pdf.setCreator('AI Studio Exporter');
 
-  const fonts = {
-    regular: await pdf.embedFont(StandardFonts.Helvetica),
-    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
-    italic: await pdf.embedFont(StandardFonts.HelveticaOblique),
-    boldItalic: await pdf.embedFont(StandardFonts.HelveticaBoldOblique),
-    mono: await pdf.embedFont(StandardFonts.Courier),
-    monoBold: await pdf.embedFont(StandardFonts.CourierBold),
-  };
+  // Latin-1 conversations keep the standard fonts: nothing to load, nothing
+  // embedded. Anything else gets Noto Sans, if it can be loaded; if it cannot,
+  // the standard fonts still produce a PDF, with '?' where they must.
+  let unicode = null;
+  if (needsUnicode(pdfText(conversation))) {
+    try {
+      unicode = await loadUnicodeFonts();
+    } catch (error) {
+      console.warn('[AI Studio Exporter] PDF fonts unavailable, using the standard fonts:', error);
+    }
+  }
+
+  let fonts;
+  let clean = toWinAnsi;
+  let cleanMono = toWinAnsi;
+  if (unicode) {
+    pdf.registerFontkit(fontkit);
+    const regular = await pdf.embedFont(unicode.bytes.regular, { subset: false });
+    const bold = await pdf.embedFont(unicode.bytes.bold, { subset: false });
+    const mono = await pdf.embedFont(unicode.bytes.mono, { subset: false });
+    // No italic files: italic is the upright face drawn slanted (see drawRuns).
+    fonts = { regular, bold, italic: regular, boldItalic: bold, mono, monoBold: mono };
+    clean = (text) => toCovered(text, unicode.text);
+    cleanMono = (text) => toCovered(text, unicode.mono);
+  } else {
+    fonts = {
+      regular: await pdf.embedFont(StandardFonts.Helvetica),
+      bold: await pdf.embedFont(StandardFonts.HelveticaBold),
+      italic: await pdf.embedFont(StandardFonts.HelveticaOblique),
+      boldItalic: await pdf.embedFont(StandardFonts.HelveticaBoldOblique),
+      mono: await pdf.embedFont(StandardFonts.Courier),
+      monoBold: await pdf.embedFont(StandardFonts.CourierBold),
+    };
+  }
+  const slant = unicode ? { ySkew: degrees(12) } : {};
   const paths = assetPaths || new Map();
 
   const fontFor = (run) => {
@@ -755,7 +919,12 @@ async function renderPdf(conversation, settings, assetPaths) {
     const { size = 10, indent = 0, color = null, gap = 5, bullet = null, quoted = false } = options;
     const lineHeight = size * 1.45;
     const left = MARGIN + PAD + indent;
-    const lines = layoutRuns(runs, fontFor, size, CONTENT_WIDTH - PAD * 2 - indent);
+    // Cleaned here, per run, because inline code is drawn in the mono font and
+    // has to be checked against that font's coverage rather than the text's.
+    const drawableRuns = unicode
+      ? runs.map((run) => ({ ...run, text: (run.code ? cleanMono : clean)(run.text) }))
+      : runs;
+    const lines = layoutRuns(drawableRuns, fontFor, size, CONTENT_WIDTH - PAD * 2 - indent);
 
     lines.forEach((line, index) => {
       advance(lineHeight);
@@ -775,7 +944,10 @@ async function renderPdf(conversation, settings, assetPaths) {
       for (const token of line) {
         const run = token.run;
         const paint = run.code ? PDF_THEME.codeInk : run.link ? PDF_THEME.link : color || tintInk();
-        page.drawText(token.text, { x, y: baseline, size, font: token.font, color: paint });
+        page.drawText(token.text, {
+          x, y: baseline, size, font: token.font, color: paint,
+          ...(run.italic && !run.code ? slant : {}),
+        });
         if (run.link) {
           // Spaces inside a link get the rule too, or a multi-word filename
           // comes out as a row of disconnected underlines.
@@ -813,7 +985,7 @@ async function renderPdf(conversation, settings, assetPaths) {
 
     const wrapped = [];
     for (const raw of rawLines.length ? rawLines : ['']) {
-      const line = toWinAnsi(raw).replace(/\s+$/, '');
+      const line = cleanMono(raw).replace(/\s+$/, '');
       for (const piece of wrapMono(line, fonts.mono, size, boxWidth - 12)) wrapped.push(piece);
     }
 
@@ -831,7 +1003,9 @@ async function renderPdf(conversation, settings, assetPaths) {
   const HEADING_SIZE = [0, 15, 13, 11.5, 10.5, 10, 10];
 
   const drawMarkdown = (text) => {
-    for (const block of parseBlocks(toWinAnsi(text))) {
+    // Code keeps its original characters into the parse, so the mono font's
+    // own coverage decides what it can draw, not the text font's.
+    for (const block of parseBlocks(unicode ? String(text) : toWinAnsi(text))) {
       if (block.type === 'code') {
         drawMono(block.lines);
       } else if (block.type === 'table') {
@@ -864,13 +1038,13 @@ async function renderPdf(conversation, settings, assetPaths) {
   const plain = (text, options) => drawRuns([{ text, bold: false, italic: false, code: false, link: null }], options);
 
   // --- cover block ---
-  plain(toWinAnsi(conversation.title || 'Untitled Conversation'), { size: 19, gap: 8 });
+  plain(clean(conversation.title || 'Untitled Conversation'), { size: 19, gap: 8 });
   for (const [key, value] of headerFacts(conversation, settings)) {
     const isUrl = /^https?:\/\//.test(value);
     drawRuns(
       [
         { text: `${key}: `, bold: true, italic: false, code: false, link: null },
-        { text: toWinAnsi(value), bold: false, italic: false, code: false, link: isUrl ? value : null },
+        { text: clean(value), bold: false, italic: false, code: false, link: isUrl ? value : null },
       ],
       { size: 9, color: PDF_THEME.muted, gap: 1 },
     );
@@ -898,7 +1072,7 @@ async function renderPdf(conversation, settings, assetPaths) {
     plain(ROLE_LABEL[roleOf(turn)], { size: 11.5, color: tint.label, gap: 1 });
 
     const subtitle = turnSubtitle(turn, settings);
-    if (subtitle) plain(toWinAnsi(subtitle), { size: 8, color: PDF_THEME.muted, gap: 3 });
+    if (subtitle) plain(clean(subtitle), { size: 8, color: PDF_THEME.muted, gap: 3 });
 
     for (const part of turn.parts) {
       const target = assetUri(paths.get(part));
@@ -906,7 +1080,7 @@ async function renderPdf(conversation, settings, assetPaths) {
         [
           { text: 'file  ', bold: false, italic: false, code: false, link: null },
           {
-            text: toWinAnsi(part.name || 'attachment'),
+            text: clean(part.name || 'attachment'),
             bold: false, italic: !target, code: false, link: target,
           },
         ],
@@ -960,14 +1134,14 @@ AISE.formats.pdf = {
   bundlesAssets: true,
   binary: true,
   render: renderPdf,
-  warn: (conversation) =>
-    hasUnsupportedGlyphs(conversation)
-      ? 'This conversation contains characters the standard PDF fonts cannot draw, ' +
-        'and they will appear as "?". Export as HTML and print to PDF from your ' +
-        'browser to keep them readable.'
-      : null,
+  // Asynchronous: answering means loading the font, to ask it what it covers.
+  warn: warnPdf,
+  libraryWarning:
+    'Some conversations contain characters the PDF font cannot draw (such as Chinese, ' +
+    'Arabic or emoji), and they appear as "?". Export those conversations as Word to keep them.',
   hasUnsupportedGlyphs,
   toWinAnsi,
+  toCovered,
   wrapLine,
   // Exposed for tests: the Markdown parse is shared with the DOCX renderer and
   // is the part most likely to break on a real conversation.

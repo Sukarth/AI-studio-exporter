@@ -190,8 +190,8 @@
     const concatenatedChunks = [];
     const entries = [];
     const failures = [];
-    // Formats can flag content they cannot represent; the PDF fonts cannot
-    // draw non-Latin scripts. A single export reports this as it happens; here
+    // Formats can flag content they cannot represent; the PDF font cannot
+    // draw Chinese or Arabic, for instance. A single export reports this as it happens; here
     // there is no per-conversation status to attach it to, so it is collected
     // and reported once at the end rather than silently producing a few hundred
     // files full of question marks.
@@ -231,8 +231,11 @@
 
         const { assetPaths, files } = AISE.exporter.planAssets(conversation);
         if (typeof format.warn === 'function') {
-          const warning = format.warn(conversation);
-          if (warning) warnings.add(warning);
+          // A single export's warning names the characters it found; across a
+          // library that would be one line per conversation, so a format can
+          // offer one summary sentence instead.
+          const warning = await format.warn(conversation);
+          if (warning) warnings.add(format.libraryWarning || warning);
         }
         const rendered = await format.render(conversation, settings, assetPaths);
 

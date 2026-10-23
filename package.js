@@ -70,6 +70,13 @@ for (const script of manifest.content_scripts || []) {
   for (const js of script.js || []) add(js, 'manifest.json');
   for (const css of script.css || []) add(css, 'manifest.json');
 }
+// Files the content scripts fetch at runtime (the PDF fonts). Nothing names
+// them in a script tag, so only the manifest knows they are needed.
+for (const entry of manifest.web_accessible_resources || []) {
+  for (const resource of entry.resources || []) add(resource, 'manifest.json');
+}
+// The Open Font License requires its text to travel with the fonts.
+add('fonts/NotoSans-OFL.txt', 'manifest.json');
 
 // Then whatever those load, transitively.
 while (queue.length) {
@@ -173,7 +180,7 @@ async function check(archive) {
     }
     console.log(`\nChecking the package, unpacked at ${dir}`);
     const failed = [];
-    for (const suite of ['test/ui.js', 'test/ui-export.js', 'test/ui-fallback.js', 'test/ui-alarm.js']) {
+    for (const suite of ['test/ui.js', 'test/ui-export.js', 'test/ui-fallback.js', 'test/ui-pdf-fonts.js', 'test/ui-alarm.js']) {
       console.log(`\n${suite}`);
       const run = spawnSync(process.execPath, [suite], {
         cwd: ROOT,

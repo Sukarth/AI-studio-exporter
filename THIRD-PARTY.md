@@ -1,7 +1,7 @@
 # Third-party code
 
 Everything bundled here is MIT-licensed, matching this project, apart from the
-two typefaces, which are under the SIL Open Font License.
+typefaces, which are under the SIL Open Font License.
 
 ## Vendored at runtime
 
@@ -10,6 +10,7 @@ two typefaces, which are under the SIL Open Font License.
 | [JSZip](https://stuk.github.io/jszip/) | 3.x | MIT | Building the export archive | `libs/jszip.min.js` |
 | [docx](https://github.com/dolanmiu/docx) | ^9.7 | MIT | `.docx` generation | bundled into `vendor/pro-documents.bundle.js` |
 | [pdf-lib](https://pdf-lib.js.org/) | ^1.17 | MIT | `.pdf` generation | bundled into `vendor/pro-documents.bundle.js` |
+| [@pdf-lib/fontkit](https://github.com/Hopding/fontkit) | ^1.1 | MIT | Embedding the PDF fonts below | bundled into `vendor/pro-documents.bundle.js` |
 
 ## Fonts
 
@@ -23,6 +24,18 @@ linked. An extension that fetches a typeface at runtime tells a third party
 every time its popup is opened, and would fall back to a system font offline.
 Three files, 55 kB in total.
 
+### PDF fonts
+
+| Font | License | Used for | Where |
+|---|---|---|---|
+| [Noto Sans](https://github.com/notofonts/latin-greek-cyrillic) | OFL-1.1 | PDF text beyond Latin-1 (Greek, Cyrillic, the rest of Latin) | `fonts/NotoSans-Regular.ttf`, `fonts/NotoSans-Bold.ttf` |
+| [Noto Sans Mono](https://github.com/notofonts/latin-greek-cyrillic) | OFL-1.1 | Code in those PDFs | `fonts/NotoSansMono-Regular.ttf` |
+
+Cut down to Latin, Greek and Cyrillic by `fonts.js` (`npm run fonts`), from
+the `@expo-google-fonts` packages. The license text ships beside them as
+`fonts/NotoSans-OFL.txt`. They are read only when a PDF needs them and are
+embedded in that PDF, never fetched from anywhere else. 912 kB in total.
+
 ## Icons
 
 The interface icons are inline SVG in the shape of
@@ -35,6 +48,8 @@ dependency to keep current.
 | Tool | Version | License | Used for |
 |---|---|---|---|
 | [esbuild](https://esbuild.github.io/) | ^0.28 | MIT | Bundling `pro/formats/documents.src.js` |
+| [fontTools](https://github.com/fonttools/fonttools) | 4.x (Python) | MIT | Subsetting the PDF fonts, in `fonts.js` |
+| [@expo-google-fonts/noto-sans](https://github.com/expo/google-fonts), [noto-sans-mono](https://github.com/expo/google-fonts) | ^0.4 | MIT (fonts OFL-1.1) | Source of the PDF font files |
 
 Build-time tooling is not shipped in the extension package.
 

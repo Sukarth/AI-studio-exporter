@@ -56,6 +56,34 @@ require(path.join(ROOT, 'src', 'api', 'decode.js'));
 
 const { AISE } = globalThis;
 
+// In the browser the PDF fonts are fetched from the extension; here they are
+// read from disk. Counted, so a test can prove an English PDF never loads them.
+let fontReads = 0;
+AISE.readExtensionFile = async (file) => {
+  fontReads++;
+  return new Uint8Array(fs.readFileSync(path.join(ROOT, file)));
+};
+
+/** Every inflated stream in a PDF, as latin1 text, for searching. */
+function pdfStreams(bytes) {
+  const out = [];
+  let cursor = 0;
+  while (true) {
+    const start = bytes.indexOf('stream', cursor);
+    if (start === -1) break;
+    let from = start + 6;
+    if (bytes[from] === 13) from++;
+    if (bytes[from] === 10) from++;
+    const end = bytes.indexOf('endstream', from);
+    if (end === -1) break;
+    try {
+      out.push(zlib.inflateSync(bytes.subarray(from, end)).toString('latin1'));
+    } catch (_) { /* not every stream is deflated */ }
+    cursor = end + 9;
+  }
+  return out;
+}
+
 const SETTINGS = {
   includeModelConfig: true, includeSystemInstruction: true,
   includeTimestamps: true, includeTokenCounts: true, includeSourceUrl: true,
@@ -297,15 +325,75 @@ async function toBytes(blob) {
     assert.ok(/TargetMode="External"/.test(rels), 'declared as an external link');
   });
 
-  await test('pdf warns when text needs glyphs the bundled font lacks', () => {
+  await test('pdf warns only for characters its font lacks', async () => {
     const latin = fixture();
-    assert.strictEqual(AISE.formats.pdf.warn(latin), null, 'no warning for Latin text');
+    assert.strictEqual(await AISE.formats.pdf.warn(latin), null, 'no warning for Latin text');
+
+    const russian = fixture();
+    russian.title = 'Экспорт разговора';
+    russian.turns[0].text = 'Привет! Как дела? Γειά σου. Tiếng Việt.';
+    assert.strictEqual(await AISE.formats.pdf.warn(russian), null, 'Cyrillic, Greek and Vietnamese are drawable');
 
     const kannada = fixture();
     kannada.turns[0].text = 'ಕನ್ನಡ ಪಠ್ಯ';
-    const warning = AISE.formats.pdf.warn(kannada);
-    assert.ok(warning, 'non-Latin text is flagged');
-    assert.ok(/HTML/.test(warning), 'points at the workaround');
+    const warning = await AISE.formats.pdf.warn(kannada);
+    assert.ok(warning, 'Kannada is flagged');
+    assert.ok(/Word/.test(warning) && /HTML/.test(warning), 'points at both workarounds');
+    assert.ok(warning.includes('ಕ'), 'names a character it cannot draw');
+
+    const chinese = fixture();
+    chinese.turns[0].text = 'Привет 你好';
+    assert.ok((await AISE.formats.pdf.warn(chinese)).includes('你'), 'Chinese is flagged, even beside Cyrillic');
+  });
+
+  await test('an English PDF uses the standard fonts and loads nothing', async () => {
+    const before = fontReads;
+    const bytes = await toBytes(await AISE.formats.pdf.render(fixture(), SETTINGS));
+    assert.ok(!/FontFile2/.test([bytes.toString('latin1'), ...pdfStreams(bytes)].join('\n')), 'no font program embedded');
+    assert.ok(bytes.length < 20000, `stays small, got ${bytes.length} bytes`);
+    // Loaded fonts are cached for the page, so only an untouched counter
+    // proves this render did not ask for them.
+    assert.ok(fontReads === before || before > 0, 'font files not read for Latin text');
+  });
+
+  await test('a Russian PDF embeds Noto Sans and draws Cyrillic, not "?"', async () => {
+    const c = fixture();
+    c.title = 'Экспорт разговора';
+    c.turns[0].text = 'Привет! **Жирный** и *курсив*, `код_пример` и обычный текст.';
+    const bytes = await toBytes(await AISE.formats.pdf.render(c, SETTINGS));
+
+    assert.strictEqual(bytes.subarray(0, 5).toString('latin1'), '%PDF-', 'PDF header');
+    // Font dictionaries live in compressed object streams, so search those too.
+    const all = [bytes.toString('latin1'), ...pdfStreams(bytes)].join('\n');
+    assert.ok(/FontFile2/.test(all), 'a TrueType font is embedded');
+    assert.ok(/NotoSans/.test(all), 'the embedded font is Noto Sans');
+    assert.ok(/NotoSansMono/.test(all), 'inline code uses the mono face');
+    // Text drawn in an embedded font is written as glyph ids (<...> Tj), not
+    // as the "(????)" literal strings the standard fonts would have produced.
+    const content = pdfStreams(bytes).join('\n');
+    assert.ok(/<[0-9A-F]+> Tj/.test(content), 'text is drawn as glyph ids');
+    assert.ok(!/\(\?{4,}/.test(content), 'no run of question marks');
+  });
+
+  await test('characters the font lacks still become "?" rather than breaking the PDF', async () => {
+    const c = fixture();
+    c.turns[0].text = 'Привет 你好 мир';
+    const bytes = await toBytes(await AISE.formats.pdf.render(c, SETTINGS));
+    assert.ok(bytes.subarray(-1024).includes(Buffer.from('%%EOF')), 'a complete PDF');
+    const { toCovered } = AISE.formats.pdf;
+    const coverage = new Set([...'Привет мир?'].map((ch) => ch.codePointAt(0)));
+    assert.strictEqual(toCovered('Привет 你好 мир', coverage), 'Привет ?? мир');
+  });
+
+  await test('typographic characters survive in a Unicode PDF', () => {
+    // With the standard fonts, smart quotes and dashes are swapped for ASCII;
+    // Noto has them, so they should be kept as written.
+    const { toCovered } = AISE.formats.pdf;
+    const coverage = new Set([...'“”–—…Ab '].map((ch) => ch.codePointAt(0)));
+    assert.strictEqual(toCovered('“A” – b — …', coverage), '“A” – b — …');
+    // And where a font lacks one, the ASCII stand-in is used, not '?'.
+    const ascii = new Set([...'Ab"-. '].map((ch) => ch.codePointAt(0)));
+    assert.strictEqual(toCovered('“A” – b', ascii), '"A" - b');
   });
 
   for (const { name, error } of failures) {

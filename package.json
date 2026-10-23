@@ -1,18 +1,20 @@
 {
   "name": "ai-studio-exporter",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Chrome extension to export conversations from Google AI Studio with media attachments",
   "main": "background.js",
   "scripts": {
     "test": "node test/run.js && node test/attachments.js && node test/license.js && node test/batch.js && node test/documents.js && node test/badge.js",
     "build": "node build.js",
     "build:watch": "node build.js --watch",
+    "fonts": "node fonts.js",
     "package": "node package.js",
     "test:core": "node test/run.js",
     "test:ui": "node test/ui.js",
     "test:ui:export": "node test/ui-export.js",
     "test:ui:fallback": "node test/ui-fallback.js",
-    "test:all": "npm test && npm run test:ui && npm run test:ui:export && npm run test:ui:fallback && npm run test:ui:alarm",
+    "test:ui:pdf": "node test/ui-pdf-fonts.js",
+    "test:all": "npm test && npm run test:ui && npm run test:ui:export && npm run test:ui:fallback && npm run test:ui:pdf && npm run test:ui:alarm",
     "test:ui:alarm": "node test/ui-alarm.js",
     "test:badge": "node test/badge.js"
   },
@@ -32,10 +34,13 @@
     "url": "https://github.com/sukarth/ai-studio-exporter"
   },
   "devDependencies": {
+    "@expo-google-fonts/noto-sans": "^0.4.2",
+    "@expo-google-fonts/noto-sans-mono": "^0.4.2",
     "esbuild": "^0.28.1",
     "playwright": "^1.62.0"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "docx": "^9.7.1",
     "pdf-lib": "^1.17.1"
   }
